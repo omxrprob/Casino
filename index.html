@@ -28,7 +28,7 @@
       padding: 10px;
       margin: 10px 5px;
       border: none;
-      border-radius: 5px; /* Square with slight round edges */
+      border-radius: 5px;
     }
     input { width: 100px; text-align: center; }
     #balance { margin-top: 20px; font-size: 1.5em; }
@@ -40,6 +40,18 @@
   </style>
 </head>
 <body>
+
+<!-- 🎵 Hidden YouTube Audio Player -->
+<div id="yt-audio" style="width:0;height:0;overflow:hidden;">
+  <iframe
+    id="yt-player"
+    width="0"
+    height="0"
+    src="https://www.youtube.com/embed/qbPszyOUgnk?autoplay=1&loop=1&playlist=qbPszyOUgnk&mute=1"
+    frameborder="0"
+    allow="autoplay"
+  ></iframe>
+</div>
 
 <!-- Start Screen -->
 <div id="start-screen" style="text-align:center; margin-top:100px;">
@@ -103,6 +115,10 @@
     balance = 100;
     inventory = {};
     showGameScreen();
+
+    // Try unmuting audio after user interaction
+    const ytPlayer = document.getElementById("yt-player");
+    ytPlayer.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
   }
 
   function toggleLoadInput() {
@@ -240,7 +256,6 @@
     let slot3 = roll();
 
     if (Math.random() < boostChance) {
-      // Apply boost: increase chance of better results
       const luckySymbol = symbols[Math.floor(Math.random() * symbols.length)];
       slot1 = slot2 = slot3 = luckySymbol;
     }
@@ -277,7 +292,7 @@
       if (item === "Super Clover") multiplier += 0.05 * count;
       if (item === "Jackpot Gem") multiplier += 0.08 * count;
     }
-    return Math.min(multiplier, 0.7); // max 70% chance of boost
+    return Math.min(multiplier, 0.7);
   }
 
   function saveGame() {
