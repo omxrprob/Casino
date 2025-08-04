@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Money Casino Slot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #222;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { margin-top: 20px; }
+    #slot-machine { font-size: 3em; margin: 20px; }
+    .slot {
+      display: inline-block;
+      width: 80px;
+      height: 80px;
+      line-height: 80px;
+      margin: 0 10px;
+      background: #444;
+      border-radius: 10px;
+    }
+    input, button, select {
+      font-size: 1em;
+      padding: 10px;
+      margin: 10px 5px;
+      border: none;
+      border-radius: 5px; /* Square with slight round edges */
+    }
+    input { width: 100px; text-align: center; }
+    #balance { margin-top: 20px; font-size: 1.5em; }
+    #shop {
+      margin-top: 40px;
+      border-top: 2px solid #888;
+      padding-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Start Screen -->
+<div id="start-screen" style="text-align:center; margin-top:100px;">
+  <h2>🎮 Welcome to the Casino</h2>
+  <button onclick="startNewGame()">Start New Game</button>
+  <button onclick="toggleLoadInput()">Play Previous Game</button>
+
+  <div id="load-screen" style="display:none; margin-top: 20px;">
+    <input type="text" id="loadCodeInput" placeholder="Paste save code (optional)">
+    <button onclick="loadPreviousGame()">Load Game</button>
+  </div>
+</div>
+
+<!-- Game Content -->
+<div id="game-content" style="display:none;">
+  <h1>🎰 Casino Slot Machine</h1>
+
+  <div>
+    <label for="betAmount">Bet Amount: $</label>
+    <input type="number" id="betAmount" min="1" value="10">
+    <button onclick="spin()">Spin</button>
+  </div>
+
+  <div id="slot-machine">
+    <div class="slot" id="slot1">❓</div>
+    <div class="slot" id="slot2">❓</div>
+    <div class="slot" id="slot3">❓</div>
+  </div>
+
+  <div id="balance">Balance: $100</div>
+  <div id="message"></div>
+
+  <div id="shop">
+    <h2>🛒 Market</h2>
+    <div>
+      <select id="shopItem"></select>
+      <button onclick="buyItem()">Buy</button>
+      <button onclick="sellItem()">Sell</button>
+    </div>
+    <div id="inventory">Inventory: (empty)</div>
+  </div>
+
+  <div>
+    <h3>💾 Save Code:</h3>
+    <div id="saveCodeDisplay" style="font-size: 0.8em; color: #aaa;"></div>
+  </div>
+</div>
+
+<script>
+  let balance = 100;
+  let inventory = {};
+  const symbols = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
+
+  const shopItems = {
+    "Lucky Charm": { base: 50, price: 50 },
+    "Super Clover": { base: 100, price: 100 },
+    "Jackpot Gem": { base: 200, price: 200 }
+  };
+
+  function startNewGame() {
+    balance = 100;
+    inventory = {};
+    showGameScreen();
+  }
+
+  function toggleLoadInput() {
+    document.getElementById('load-screen').style.display = 'block';
+  }
+
+  function loadPreviousGame() {
+    const codeInput = document.getElementById("loadCodeInput").value.trim();
+    let data = null;
+
+    try {
+      if (codeInput) {
+        data = JSON.parse(atob(codeInput));
+      } else {
+        const saved = localStorage.getItem("casinoSave");
+        if (saved) data = JSON.parse(saved);
+      }
+
+      if (!data || !("balance" in data) || !("inventory" in data)) {
+        throw new Error("Invalid save data");
+      }
+
+      balance = data.balance;
+      inventory = data.inventory;
+      showGameScreen();
+
+    } catch (e) {
+      alert("❌ Invalid or corrupted save code!");
+    }
+  }
+
+  function showGameScreen() {
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-content').style.display = 'block';
+
+    updateBalance();
+    updateInventory();
+    updateMarketPrices();
+    schedulePriceUpdate();
+    saveGame();
+  }
+
+  function updateBalance() {
+    document.getElementById('balance').innerText = `Balance: $${balance}`;
+  }
+
+  function updateInventory() {
+    const entries = Object.entries(inventory);
+    const invText = entries.length
+      ? entries.map(([item, count]) => `${item} x${count}`).join(', ')
+      : "(empty)";
+    document.getElementById('inventory').innerText = "Inventory: " + invText;
+  }
+
+  function updateMarketPrices() {
+    for (let item in shopItems) {
+      const multiplier = 1 + Math.random() * 0.9;
+      shopItems[item].price = Math.max(50, Math.min(500, Math.round(shopItems[item].base * multiplier)));
+    }
+    updateShopDropdown();
+  }
+
+  function updateShopDropdown() {
+    const select = document.getElementById('shopItem');
+    select.innerHTML = '';
+    for (let item in shopItems) {
+      const price = shopItems[item].price;
+      const emoji = item === "Lucky Charm" ? "🎁" : item === "Super Clover" ? "🍀" : "💎";
+      const option = document.createElement('option');
+      option.value = item;
+      option.textContent = `${emoji} ${item} - $${price}`;
+      select.appendChild(option);
+    }
+  }
+
+  function buyItem() {
+    const itemName = document.getElementById('shopItem').value;
+    const itemPrice = shopItems[itemName].price;
+
+    if (balance < itemPrice) {
+      alert("You don't have enough money to buy this item.");
+      return;
+    }
+
+    balance -= itemPrice;
+    inventory[itemName] = (inventory[itemName] || 0) + 1;
+
+    updateBalance();
+    updateInventory();
+    saveGame();
+  }
+
+  function sellItem() {
+    const items = Object.keys(inventory);
+    if (!items.length) {
+      alert("You have nothing to sell!");
+      return;
+    }
+
+    const itemName = items[0];
+    const price = shopItems[itemName].price;
+
+    inventory[itemName]--;
+    if (inventory[itemName] <= 0) delete inventory[itemName];
+
+    balance += price;
+    alert(`You sold your ${itemName} for $${price}`);
+
+    updateBalance();
+    updateInventory();
+    saveGame();
+  }
+
+  function spin() {
+    const bet = parseInt(document.getElementById('betAmount').value);
+    const msg = document.getElementById('message');
+
+    if (isNaN(bet) || bet <= 0) {
+      msg.innerText = 'Enter a valid bet amount.';
+      return;
+    }
+
+    if (balance < bet) {
+      msg.innerText = 'Not enough balance!';
+      return;
+    }
+
+    balance -= bet;
+
+    const boostChance = getBoostMultiplier();
+
+    const roll = () => symbols[Math.floor(Math.random() * symbols.length)];
+    let slot1 = roll();
+    let slot2 = roll();
+    let slot3 = roll();
+
+    if (Math.random() < boostChance) {
+      // Apply boost: increase chance of better results
+      const luckySymbol = symbols[Math.floor(Math.random() * symbols.length)];
+      slot1 = slot2 = slot3 = luckySymbol;
+    }
+
+    document.getElementById('slot1').innerText = slot1;
+    document.getElementById('slot2').innerText = slot2;
+    document.getElementById('slot3').innerText = slot3;
+
+    let winnings = 0;
+
+    if (slot1 === '7️⃣' && slot2 === '7️⃣' && slot3 === '7️⃣') {
+      winnings = bet * 5;
+      msg.innerText = `🔥 Triple 7s! You won $${winnings}!`;
+    } else if (slot1 === slot2 && slot2 === slot3) {
+      winnings = bet * 3.5;
+      msg.innerText = `🎉 Jackpot! You won $${winnings.toFixed(2)}!`;
+    } else if (slot1 === slot2 || slot2 === slot3 || slot1 === slot3) {
+      winnings = bet * 2;
+      msg.innerText = `😊 Nice! You won $${winnings}!`;
+    } else {
+      msg.innerText = '🙁 Try again!';
+    }
+
+    balance += winnings;
+    updateBalance();
+    saveGame();
+  }
+
+  function getBoostMultiplier() {
+    let multiplier = 0;
+    for (let item in inventory) {
+      const count = inventory[item];
+      if (item === "Lucky Charm") multiplier += 0.03 * count;
+      if (item === "Super Clover") multiplier += 0.05 * count;
+      if (item === "Jackpot Gem") multiplier += 0.08 * count;
+    }
+    return Math.min(multiplier, 0.7); // max 70% chance of boost
+  }
+
+  function saveGame() {
+    const state = {
+      balance: balance,
+      inventory: inventory
+    };
+    const code = btoa(JSON.stringify(state));
+    document.getElementById('saveCodeDisplay').innerText = code;
+    localStorage.setItem("casinoSave", JSON.stringify(state));
+  }
+
+  function schedulePriceUpdate() {
+    updateMarketPrices();
+    setTimeout(schedulePriceUpdate, 5000 + Math.random() * 5000);
+  }
+</script>
+
+</body>
+</html>
