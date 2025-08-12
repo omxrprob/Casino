@@ -212,9 +212,17 @@
   let isMuted = true;
   // ⚠️ IMPORTANT: Change this to a long, random, and secure string.
   const SECRET_SAVE_KEY = 'YOUR_SECRET_SAVE_KEY_HERE';
-  // ⚠️ IMPORTANT: Change this to a long, random, and secure string.
-  const SECRET_GIFT_KEY = 'YOUR_SECRET_GIFT_KEY_HERE';
   const GIFT_CODE_PRICE = 50;
+
+  // New map to store bought gift codes and their success chance
+  let boughtGiftCodes = new Map();
+
+  // --- NEW: Blocked words list ---
+  const blockedWords = new Set([
+    "fuck", "shit", "ass", "bitch", "cunt",
+    "money", "gift", "code", "jackpot",
+    "win", "free"
+  ]);
 
   const shopItems = {
     "Lucky Charm": { base: 50, price: 50 },
@@ -239,6 +247,7 @@
     balance = 100;
     inventory = {};
     usedGiftCodes = new Set();
+    boughtGiftCodes = new Map();
     showGameScreen();
   }
 
@@ -266,13 +275,14 @@
 
       const data = JSON.parse(decodedData);
 
-      if (!("balance" in data) || !("inventory" in data) || !("usedGiftCodes" in data)) {
+      if (!("balance" in data) || !("inventory" in data) || !("usedGiftCodes" in data) || !("boughtGiftCodes" in data)) {
         throw new Error("Invalid save data structure");
       }
 
       balance = data.balance;
       inventory = data.inventory;
       usedGiftCodes = new Set(data.usedGiftCodes);
+      boughtGiftCodes = new Map(Object.entries(data.boughtGiftCodes));
 
       showGameScreen();
 
@@ -436,7 +446,8 @@
     const state = {
       balance: balance,
       inventory: inventory,
-      usedGiftCodes: Array.from(usedGiftCodes)
+      usedGiftCodes: Array.from(usedGiftCodes),
+      boughtGiftCodes: Object.fromEntries(boughtGiftCodes)
     };
     const stateString = JSON.stringify(state);
     const signature = sha256.hmac(SECRET_SAVE_KEY, stateString);
@@ -479,83 +490,86 @@
     balance -= GIFT_CODE_PRICE;
     updateBalance();
 
-    const expirationTime = Date.now() + 10 * 60 * 1000; // 10 minutes from now
-    const rewardType = getRandomReward();
-    const giftCodeData = JSON.stringify({ reward: rewardType, expiry: expirationTime });
-    const signature = sha256.hmac(SECRET_GIFT_KEY, giftCodeData);
-    const newGiftCode = btoa(giftCodeData) + ':' + signature;
+    const newCode = Math.random().toString(36).substring(2, 10).toUpperCase(); // A unique random string
+    const successChance = Math.floor(Math.random() * 70) + 10; // Random chance between 10% and 80%
+
+    // Store the code and its success chance
+    boughtGiftCodes.set(newCode, successChance);
     
-    document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${GIFT_CODE_PRICE}! Redeem it now:\n\n${newGiftCode}`;
+    document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${GIFT_CODE_PRICE}!
+    It has a ${successChance}% chance of working.
+    Code: ${newCode}`;
+    
     saveGame();
   }
 
   function redeemGiftCode() {
-    const code = document.getElementById('giftCodeInput').value.trim();
+    const code = document.getElementById('giftCodeInput').value.trim().toLowerCase();
     const messageElement = document.getElementById('giftCodeMessage');
+    
+    // --- NEW: Check for blocked words first ---
+    if (blockedWords.has(code)) {
+      messageElement.innerText = "❌ That code is invalid.";
+      return;
+    }
     
     if (usedGiftCodes.has(code)) {
       messageElement.innerText = "❌ You have already redeemed this code!";
       return;
     }
-    
-    // Check for a daily code (these are fixed and don't expire)
-    const today = new Date().toISOString().slice(0, 10);
-    const dailyCodeData = JSON.stringify({ reward: 'money_1000', expiry: 0, date: today });
-    const validDailyCode = btoa(dailyCodeData) + ':' + sha256.hmac(SECRET_GIFT_KEY, dailyCodeData);
-    
-    if (code === validDailyCode) {
-      const rewardAmount = 1000;
-      balance += rewardAmount;
+
+    // Check for a fixed, hardcoded daily code (100% chance)
+    const dailyCode = "dailygift";
+    if (code === dailyCode) {
+      balance += 1000;
       usedGiftCodes.add(code);
       updateBalance();
       saveGame();
-      messageElement.innerText = `🎉 Success! You received $${rewardAmount}!`;
+      messageElement.innerText = `🎉 Success! You received $1000!`;
       return;
     }
 
-    // Now check for a purchased, expiring code
-    try {
-      const [encodedData, signature] = code.split(':');
-      const decodedData = atob(encodedData);
-      const expectedSignature = sha256.hmac(SECRET_GIFT_KEY, decodedData);
-
-      if (signature !== expectedSignature) {
-        throw new Error("Invalid or corrupted gift code!");
-      }
-
-      const data = JSON.parse(decodedData);
+    // Check for a bought code and its success chance
+    const upperCaseCode = code.toUpperCase();
+    if (boughtGiftCodes.has(upperCaseCode)) {
+      const successChance = boughtGiftCodes.get(upperCaseCode);
+      const randomRoll = Math.floor(Math.random() * 100) + 1; // 1-100
       
-      if (Date.now() > data.expiry) {
-        messageElement.innerText = "❌ This gift code has expired!";
+      boughtGiftCodes.delete(upperCaseCode); // Code can only be used once, whether it works or not
+      usedGiftCodes.add(upperCaseCode);
+      saveGame();
+
+      if (randomRoll <= successChance) {
+        // Code works! Give a random reward.
+        let rewardText = "";
+        const rewardType = getRandomReward();
+
+        if (rewardType.startsWith('money_')) {
+          const amount = parseInt(rewardType.split('_')[1]);
+          balance += amount;
+          rewardText = `You received $${amount}!`;
+        } else if (rewardType.startsWith('item_')) {
+          const item = rewardType.split('_')[1];
+          inventory[item] = (inventory[item] || 0) + 1;
+          rewardText = `You received a ${item}!`;
+        } else if (rewardType === 'gift_code') {
+          const newGiftCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+          const newSuccessChance = Math.floor(Math.random() * 70) + 10;
+          boughtGiftCodes.set(newGiftCode, newSuccessChance);
+          rewardText = `You received a new gift code with a ${newSuccessChance}% chance! Code: ${newGiftCode}`;
+        }
+        
+        updateBalance();
+        updateInventory();
+        messageElement.innerText = `🎉 Success! The code worked! ${rewardText}`;
+        return;
+      } else {
+        messageElement.innerText = `🙁 Unlucky! The code had a ${successChance}% chance but it failed. Better luck next time!`;
         return;
       }
-      
-      // Redeem the reward
-      let rewardText = "";
-      if (data.reward.startsWith('money_')) {
-        const amount = parseInt(data.reward.split('_')[1]);
-        balance += amount;
-        rewardText = `You received $${amount}!`;
-      } else if (data.reward.startsWith('item_')) {
-        const item = data.reward.split('_')[1];
-        inventory[item] = (inventory[item] || 0) + 1;
-        rewardText = `You received a ${item}!`;
-      } else if (data.reward === 'gift_code') {
-        const expirationTime = Date.now() + 10 * 60 * 1000;
-        const newRewardType = getRandomReward();
-        const newGiftCodeData = JSON.stringify({ reward: newRewardType, expiry: expirationTime });
-        const newGiftCode = btoa(newGiftCodeData) + ':' + sha256.hmac(SECRET_GIFT_KEY, newGiftCodeData);
-        rewardText = `You received a new gift code! Redeem it now:\n\n${newGiftCode}`;
-      }
-      
-      usedGiftCodes.add(code);
-      updateBalance();
-      updateInventory();
-      saveGame();
-      messageElement.innerText = `🎉 Success! ${rewardText}`;
-    } catch (e) {
-      messageElement.innerText = "❌ Invalid gift code.";
     }
+
+    messageElement.innerText = "❌ Invalid or expired gift code.";
   }
 
   // --- Helper Functions for new gift codes ---
@@ -573,7 +587,6 @@
       return `money_${amount}`;
     }
   }
-
 </script>
 
 </body>
