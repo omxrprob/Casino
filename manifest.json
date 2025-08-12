@@ -1,0 +1,21 @@
+{
+  "name": "Casino Slot Machine",
+  "short_name": "Casino Game",
+  "description": "A fun casino slot machine game.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#222222",
+  "theme_color": "#222222",
+  "icons": [
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
