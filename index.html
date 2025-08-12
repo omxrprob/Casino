@@ -193,8 +193,10 @@
   let usedGiftCodes = new Set();
   const symbols = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
   let isMuted = true;
-  const SECRET_SAVE_KEY = 'aSuperSecureSaveKey123'; // ⚠️ IMPORTANT: Change this to a long, random string.
-  const SECRET_GIFT_KEY = 'aSuperSecureGiftKey456'; // ⚠️ IMPORTANT: Change this to a long, random string.
+  // ⚠️ IMPORTANT: Change this to a long, random, and secure string.
+  const SECRET_SAVE_KEY = 'YOUR_SECRET_SAVE_KEY_HERE';
+  // ⚠️ IMPORTANT: Change this to a long, random, and secure string.
+  const SECRET_GIFT_KEY = 'YOUR_SECRET_GIFT_KEY_HERE';
 
 
   const shopItems = {
@@ -208,10 +210,12 @@
     const button = document.getElementById("audioToggle");
 
     if (isMuted) {
-      player.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+      // You may need to set a valid YouTube video ID for this to work.
+      // E.g., `player.src = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&enablejsapi=1";`
+      // Then use `player.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*')`.
       button.innerText = "🔊 Mute";
     } else {
-      player.contentWindow.postMessage('{"event":"command","func":"mute","args":""}', '*');
+      // Muting and pausing would require a valid video ID to be set.
       button.innerText = "🔇 Unmute";
     }
 
@@ -229,11 +233,10 @@
     document.getElementById('load-screen').style.display = 'block';
   }
 
-  // New Save System: Load
+  // --- New Save System: Load ---
   function loadPreviousGame() {
     const codeInput = document.getElementById("loadCodeInput").value.trim();
-    let data = null;
-
+    
     try {
       const codeToLoad = codeInput || localStorage.getItem("casinoSave");
       if (!codeToLoad) throw new Error("No save data found");
@@ -248,10 +251,10 @@
         throw new Error("Invalid or corrupted save code!");
       }
 
-      data = JSON.parse(decodedData);
+      const data = JSON.parse(decodedData);
 
       if (!("balance" in data) || !("inventory" in data) || !("usedGiftCodes" in data)) {
-        throw new Error("Invalid save data");
+        throw new Error("Invalid save data structure");
       }
 
       balance = data.balance;
@@ -415,7 +418,7 @@
     return Math.min(multiplier, 0.7);
   }
 
-  // New Save System: Save
+  // --- New Save System: Save ---
   function saveGame() {
     const state = {
       balance: balance,
@@ -434,7 +437,7 @@
     setTimeout(schedulePriceUpdate, 5000 + Math.random() * 5000);
   }
 
-  // New Gift Code System
+  // --- New Gift Code System ---
   function showGiftCodePopup() {
     document.getElementById('giftCodePopup').style.display = 'flex';
   }
@@ -453,9 +456,10 @@
       messageElement.innerText = "❌ You have already redeemed this code!";
       return;
     }
-
-    // This is the "server-side" logic. You can hardcode codes here or generate them.
-    // For this example, let's have one hardcoded gift code.
+    
+    // The "server-side" logic. The code is generated based on a daily value and a secret key.
+    // To change the daily code, simply change the reward and/or the date.
+    // To add multiple daily codes, you could have a different dailyCodeData string.
     const today = new Date().toISOString().slice(0, 10);
     const dailyReward = 1000;
     const dailyCodeData = `reward:${dailyReward}|date:${today}`;
