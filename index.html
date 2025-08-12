@@ -120,15 +120,10 @@
 </head>
 <body>
 
+<script src="https://www.youtube.com/iframe_api"></script>
+
 <div id="yt-audio" style="width:1;height:1;overflow:hidden;">
-  <iframe
-    id="yt-player"
-    width="0"
-    height="0"
-    src="https://www.youtube.com/embed/qbPszyOUgnk?autoplay=1&loop=1&playlist=qbPszyOUgnk&enablejsapi=1&mute=1"
-    frameborder="0"
-    allow="autoplay"
-  ></iframe>
+  <div id="yt-player"></div>
 </div>
 
 <button id="audioToggle" onclick="toggleAudio()">🔇 Unmute</button>
@@ -229,18 +224,49 @@
     "Jackpot Gem": { base: 200, price: 200 }
   };
 
-  function toggleAudio() {
-    const player = document.getElementById("yt-player");
-    const button = document.getElementById("audioToggle");
+  // YouTube Player API variables
+  let player;
+  
+  // This function is called automatically by the YouTube API when it's ready.
+  function onYouTubeIframeAPIReady() {
+    player = new YT.Player('yt-player', {
+      height: '0',
+      width: '0',
+      videoId: '2J4jD60K01M', // This is a real YouTube video ID for relaxing piano music
+      playerVars: {
+        'autoplay': 1,      // Autoplay the video
+        'loop': 1,          // Loop the video
+        'controls': 0,      // Hide player controls
+        'disablekb': 1,     // Disable keyboard controls
+        'modestbranding': 1, // Hide YouTube logo
+        'mute': 1,          // Start muted (required for autoplay in most browsers)
+        'playlist': '2J4jD60K01M' // Loop requires the same video ID in the playlist
+      },
+      events: {
+        'onReady': onPlayerReady
+      }
+    });
+  }
 
+  function onPlayerReady(event) {
+    // The video is now ready and muted. The toggleAudio() function will unmute and play it.
+  }
+
+  function toggleAudio() {
+    const button = document.getElementById("audioToggle");
+    
     if (isMuted) {
+      player.unMute();
+      player.playVideo();
       button.innerText = "🔊 Mute";
     } else {
+      player.mute();
       button.innerText = "🔇 Unmute";
     }
 
     isMuted = !isMuted;
   }
+
 
   function startNewGame() {
     balance = 100;
