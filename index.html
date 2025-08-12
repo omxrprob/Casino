@@ -285,7 +285,7 @@
     document.getElementById('load-screen').style.display = 'block';
   }
 
-  // --- New Save System: Load ---
+  // --- NEW LOAD FUNCTION ---
   function loadPreviousGame() {
     const codeInput = document.getElementById("loadCodeInput").value.trim();
     
@@ -311,8 +311,10 @@
 
       balance = data.balance;
       inventory = data.inventory;
+      
+      // Fix: Correctly load Set and Map from their saved array formats
       usedGiftCodes = new Set(data.usedGiftCodes);
-      boughtGiftCodes = new Map(Object.entries(data.boughtGiftCodes));
+      boughtGiftCodes = new Map(data.boughtGiftCodes);
 
       showGameScreen();
 
@@ -471,13 +473,15 @@
     return Math.min(multiplier, 0.7);
   }
 
-  // --- New Save System: Save ---
+  // --- NEW SAVE FUNCTION ---
   function saveGame() {
     const state = {
       balance: balance,
       inventory: inventory,
-      usedGiftCodes: Array.from(usedGiftCodes),
-      boughtGiftCodes: Object.fromEntries(boughtGiftCodes)
+      // Fix: Convert Map to an array of key-value pairs for serialization
+      boughtGiftCodes: Array.from(boughtGiftCodes.entries()),
+      // Fix: Convert Set to an array for serialization
+      usedGiftCodes: Array.from(usedGiftCodes)
     };
     const stateString = JSON.stringify(state);
     const signature = sha256.hmac(SECRET_SAVE_KEY, stateString);
@@ -486,7 +490,6 @@
     localStorage.setItem("casinoSave", code);
   }
 
-  // --- New Copy function ---
   function copySaveCode() {
     const saveCode = document.getElementById('saveCodeDisplay').innerText;
     if (saveCode) {
