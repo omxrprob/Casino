@@ -285,7 +285,6 @@
     document.getElementById('load-screen').style.display = 'block';
   }
 
-  // --- NEW LOAD FUNCTION ---
   function loadPreviousGame() {
     const codeInput = document.getElementById("loadCodeInput").value.trim();
     
@@ -312,7 +311,6 @@
       balance = data.balance;
       inventory = data.inventory;
       
-      // Fix: Correctly load Set and Map from their saved array formats
       usedGiftCodes = new Set(data.usedGiftCodes);
       boughtGiftCodes = new Map(data.boughtGiftCodes);
 
@@ -334,8 +332,9 @@
     saveGame();
   }
 
+  // --- UPDATED updateBalance FUNCTION ---
   function updateBalance() {
-    document.getElementById('balance').innerText = `Balance: $${balance}`;
+    document.getElementById('balance').innerText = `Balance: $${balance.toFixed(2)}`;
   }
 
   function updateInventory() {
@@ -473,14 +472,11 @@
     return Math.min(multiplier, 0.7);
   }
 
-  // --- NEW SAVE FUNCTION ---
   function saveGame() {
     const state = {
       balance: balance,
       inventory: inventory,
-      // Fix: Convert Map to an array of key-value pairs for serialization
       boughtGiftCodes: Array.from(boughtGiftCodes.entries()),
-      // Fix: Convert Set to an array for serialization
       usedGiftCodes: Array.from(usedGiftCodes)
     };
     const stateString = JSON.stringify(state);
@@ -525,11 +521,13 @@
     
     // Calculate a random percentage (25% to 90%)
     const randomPercentage = Math.floor(Math.random() * (90 - 25 + 1)) + 25;
-    const price = Math.round(balance * (randomPercentage / 100));
+    
+    // The price is now a decimal percentage of the current balance
+    const price = balance * (randomPercentage / 100);
 
     // Store the price in a data attribute to use when buying
     priceTextElement.dataset.price = price;
-    priceTextElement.innerText = `Price: $${price} (${randomPercentage}%)`;
+    priceTextElement.innerText = `Price: $${price.toFixed(2)} (${randomPercentage}%)`;
     
     document.getElementById('buyGiftCodePopup').style.display = 'flex';
   }
@@ -539,12 +537,13 @@
     document.getElementById('buyGiftCodeMessage').innerText = '';
   }
 
+  // --- UPDATED buyGiftCode FUNCTION ---
   function buyGiftCode() {
     const priceTextElement = document.getElementById('buyGiftCodePrice');
-    const price = parseInt(priceTextElement.dataset.price, 10);
+    const price = parseFloat(priceTextElement.dataset.price);
     
     if (balance < price) {
-      document.getElementById('buyGiftCodeMessage').innerText = `❌ Not enough money! You need $${price}.`;
+      document.getElementById('buyGiftCodeMessage').innerText = `❌ Not enough money! You need $${price.toFixed(2)}.`;
       return;
     }
     
@@ -557,7 +556,7 @@
     // Store the code and its success chance
     boughtGiftCodes.set(newCode, successChance);
     
-    document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${price}!
+    document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${price.toFixed(2)}!
     It has a ${successChance}% chance of working.
     Code: ${newCode}`;
     
