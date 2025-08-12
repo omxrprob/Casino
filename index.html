@@ -198,7 +198,8 @@
 
   <div>
     <h3>💾 Save Code:</h3>
-    <div id="saveCodeDisplay" style="font-size: 0.8em; color: #aaa; word-break: break-all;"></div>
+    <div id="saveCodeDisplay" style="font-size: 0.8em; color: #aaa; word-break: break-all; display: inline-block;"></div>
+    <button id="copySaveCodeBtn" onclick="copySaveCode()">Copy</button>
   </div>
 </div>
 
@@ -482,6 +483,21 @@
     const code = btoa(stateString) + ':' + signature;
     document.getElementById('saveCodeDisplay').innerText = code;
     localStorage.setItem("casinoSave", code);
+  }
+
+  // --- New Copy function ---
+  function copySaveCode() {
+    const saveCode = document.getElementById('saveCodeDisplay').innerText;
+    if (saveCode) {
+        navigator.clipboard.writeText(saveCode)
+            .then(() => {
+                alert('💾 Save code copied to clipboard!');
+            })
+            .catch(err => {
+                console.error('Failed to copy text: ', err);
+                alert('❌ Failed to copy the save code. Please copy it manually.');
+            });
+    }
   }
 
   function schedulePriceUpdate() {
