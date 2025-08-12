@@ -232,20 +232,19 @@
   // YouTube Player API variables
   let player;
   
-  // This function is called automatically by the YouTube API when it's ready.
   function onYouTubeIframeAPIReady() {
     player = new YT.Player('yt-player', {
       height: '0',
       width: '0',
-      videoId: '2J4jD60K01M', // This is a real YouTube video ID for relaxing piano music
+      videoId: '2J4jD60K01M',
       playerVars: {
-        'autoplay': 1,      // Autoplay the video
-        'loop': 1,          // Loop the video
-        'controls': 0,      // Hide player controls
-        'disablekb': 1,     // Disable keyboard controls
-        'modestbranding': 1, // Hide YouTube logo
-        'mute': 1,          // Start muted (required for autoplay in most browsers)
-        'playlist': '2J4jD60K01M' // Loop requires the same video ID in the playlist
+        'autoplay': 1,
+        'loop': 1,
+        'controls': 0,
+        'disablekb': 1,
+        'modestbranding': 1,
+        'mute': 1,
+        'playlist': '2J4jD60K01M'
       },
       events: {
         'onReady': onPlayerReady
@@ -253,9 +252,7 @@
     });
   }
 
-  function onPlayerReady(event) {
-    // The video is now ready and muted. The toggleAudio() function will unmute and play it.
-  }
+  function onPlayerReady(event) {}
 
   function toggleAudio() {
     const button = document.getElementById("audioToggle");
@@ -365,7 +362,6 @@
     }
   }
 
-  // --- UPDATED buyItem FUNCTION ---
   function buyItem() {
     const itemName = document.getElementById('shopItem').value;
     const itemPrice = shopItems[itemName].price;
@@ -505,7 +501,6 @@
     setTimeout(schedulePriceUpdate, 5000 + Math.random() * 5000);
   }
 
-  // --- Gift Code System ---
   function showGiftCodePopup() {
     document.getElementById('giftCodePopup').style.display = 'flex';
   }
@@ -539,7 +534,6 @@
     document.getElementById('buyGiftCodeMessage').innerText = '';
   }
 
-  // --- UPDATED buyGiftCode FUNCTION ---
   function buyGiftCode() {
     const priceTextElement = document.getElementById('buyGiftCodePrice');
     const price = parseFloat(priceTextElement.dataset.price);
@@ -552,10 +546,9 @@
     balance -= price;
     updateBalance();
 
-    const newCode = Math.random().toString(36).substring(2, 10).toUpperCase(); // A unique random string
-    const successChance = Math.floor(Math.random() * 70) + 10; // Random chance between 10% and 80%
+    const newCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const successChance = Math.floor(Math.random() * 70) + 10;
 
-    // Store the code and its success chance
     boughtGiftCodes.set(newCode, successChance);
     
     document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${price.toFixed(2)}!
@@ -569,7 +562,6 @@
     const code = document.getElementById('giftCodeInput').value.trim().toLowerCase();
     const messageElement = document.getElementById('giftCodeMessage');
     
-    // --- Check for blocked words first ---
     if (blockedWords.has(code)) {
       messageElement.innerText = "❌ That code is invalid.";
       return;
@@ -580,7 +572,6 @@
       return;
     }
 
-    // Check for a fixed, hardcoded daily code (100% chance)
     const dailyCode = "dailygift";
     if (code === dailyCode) {
       balance += 1000;
@@ -591,18 +582,16 @@
       return;
     }
 
-    // Check for a bought code and its success chance
     const upperCaseCode = code.toUpperCase();
     if (boughtGiftCodes.has(upperCaseCode)) {
       const successChance = boughtGiftCodes.get(upperCaseCode);
-      const randomRoll = Math.floor(Math.random() * 100) + 1; // 1-100
+      const randomRoll = Math.floor(Math.random() * 100) + 1;
       
-      boughtGiftCodes.delete(upperCaseCode); // Code can only be used once, whether it works or not
+      boughtGiftCodes.delete(upperCaseCode);
       usedGiftCodes.add(upperCaseCode);
       saveGame();
 
       if (randomRoll <= successChance) {
-        // Code works! Give a random reward.
         let rewardText = "";
         const rewardType = getRandomReward();
 
@@ -634,16 +623,15 @@
     messageElement.innerText = "❌ Invalid or expired gift code.";
   }
 
-  // --- Helper Functions for new gift codes ---
   function getRandomReward() {
     const roll = Math.random();
-    if (roll < 0.05) { // 5% chance for a new gift code
+    if (roll < 0.05) {
       return 'gift_code';
-    } else if (roll < 0.40) { // 35% chance for an item
+    } else if (roll < 0.40) {
       const items = ['Lucky Charm', 'Super Clover', 'Jackpot Gem'];
       const item = items[Math.floor(Math.random() * items.length)];
       return `item_${item}`;
-    } else { // 60% chance for money
+    } else {
       const amounts = [50, 100, 200, 500, 1000];
       const amount = amounts[Math.floor(Math.random() * amounts.length)];
       return `money_${amount}`;
