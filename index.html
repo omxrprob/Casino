@@ -173,9 +173,10 @@
   <h1>🎰 Casino Slot Machine</h1>
 
   <div>
-    <label for="betAmount">Bet Amount: $</label>
-    <input type="number" id="betAmount" min="1" value="10">
+    <label for="betAmount">Bet Amount:</label>
+    <input type="text" id="betAmount" value="10">
     <button onclick="spin()">Spin</button>
+    <button id="autoSpinBtn" onclick="toggleAutoSpin()">Auto Spin</button>
   </div>
 
   <div id="slot-machine">
@@ -213,10 +214,7 @@
   // ⚠️ IMPORTANT: Change this to a long, random, and secure string.
   const SECRET_SAVE_KEY = 'YOUR_SECRET_SAVE_KEY_HERE';
 
-  // New map to store bought gift codes and their success chance
   let boughtGiftCodes = new Map();
-
-  // --- Blocked words list ---
   const blockedWords = new Set([
     "fuck", "shit", "ass", "bitch", "cunt",
     "money", "gift", "code", "jackpot",
@@ -229,9 +227,9 @@
     "Jackpot Gem": { base: 200, price: 200 }
   };
 
-  // YouTube Player API variables
   let player;
-  
+  let autoSpinInterval = null;
+
   function onYouTubeIframeAPIReady() {
     player = new YT.Player('yt-player', {
       height: '0',
@@ -256,7 +254,6 @@
 
   function toggleAudio() {
     const button = document.getElementById("audioToggle");
-    
     if (isMuted) {
       player.unMute();
       player.playVideo();
@@ -265,10 +262,8 @@
       player.mute();
       button.innerText = "🔇 Unmute";
     }
-
     isMuted = !isMuted;
   }
-
 
   function startNewGame() {
     balance = 100;
@@ -284,35 +279,25 @@
 
   function loadPreviousGame() {
     const codeInput = document.getElementById("loadCodeInput").value.trim();
-    
     try {
       const codeToLoad = codeInput || localStorage.getItem("casinoSave");
       if (!codeToLoad) throw new Error("No save data found");
-      
       const [encodedData, signature] = codeToLoad.split(':');
       if (!encodedData || !signature) throw new Error("Invalid save format");
-
       const decodedData = atob(encodedData);
       const expectedSignature = sha256.hmac(SECRET_SAVE_KEY, decodedData);
-
       if (signature !== expectedSignature) {
         throw new Error("Invalid or corrupted save code!");
       }
-
       const data = JSON.parse(decodedData);
-
       if (!("balance" in data) || !("inventory" in data) || !("usedGiftCodes" in data) || !("boughtGiftCodes" in data)) {
         throw new Error("Invalid save data structure");
       }
-
       balance = data.balance;
       inventory = data.inventory;
-      
       usedGiftCodes = new Set(data.usedGiftCodes);
       boughtGiftCodes = new Map(data.boughtGiftCodes);
-
       showGameScreen();
-
     } catch (e) {
       alert(`❌ Error loading game: ${e.message}`);
     }
@@ -321,7 +306,6 @@
   function showGameScreen() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('game-content').style.display = 'block';
-
     updateBalance();
     updateInventory();
     updateMarketPrices();
@@ -365,15 +349,12 @@
   function buyItem() {
     const itemName = document.getElementById('shopItem').value;
     const itemPrice = shopItems[itemName].price;
-
     if (balance <= 0 || balance < itemPrice) {
       alert("You don't have enough money to buy this item.");
       return;
     }
-
     balance -= itemPrice;
     inventory[itemName] = (inventory[itemName] || 0) + 1;
-
     updateBalance();
     updateInventory();
     saveGame();
@@ -385,33 +366,40 @@
       alert("You have nothing to sell!");
       return;
     }
-
     const itemName = items[0];
     const price = shopItems[itemName].price;
-
     if (inventory[itemName] <= 0) {
       alert("You don't have this item to sell!");
       return;
     }
-
     inventory[itemName]--;
     if (inventory[itemName] <= 0) delete inventory[itemName];
-
     balance += price;
     alert(`You sold your ${itemName} for $${price}`);
-
     updateBalance();
     updateInventory();
     saveGame();
   }
 
+  // --- UPDATED spin FUNCTION ---
   function spin() {
-    const bet = parseInt(document.getElementById('betAmount').value);
+    const betInput = document.getElementById('betAmount').value.trim();
+    let bet;
     const msg = document.getElementById('message');
 
-    if (isNaN(bet) || bet <= 0) {
-      msg.innerText = 'Enter a valid bet amount.';
-      return;
+    if (betInput.endsWith('%')) {
+      const percent = parseFloat(betInput.slice(0, -1));
+      if (isNaN(percent) || percent <= 0) {
+        msg.innerText = 'Enter a valid percentage (e.g., 10%).';
+        return;
+      }
+      bet = balance * (percent / 100);
+    } else {
+      bet = parseFloat(betInput);
+      if (isNaN(bet) || bet <= 0) {
+        msg.innerText = 'Enter a valid bet amount.';
+        return;
+      }
     }
 
     if (balance < bet) {
@@ -422,7 +410,6 @@
     balance -= bet;
 
     const boostChance = getBoostMultiplier();
-
     const roll = () => symbols[Math.floor(Math.random() * symbols.length)];
     let slot1 = roll();
     let slot2 = roll();
@@ -438,16 +425,15 @@
     document.getElementById('slot3').innerText = slot3;
 
     let winnings = 0;
-
     if (slot1 === '7️⃣' && slot2 === '7️⃣' && slot3 === '7️⃣') {
       winnings = bet * 5;
-      msg.innerText = `🔥 Triple 7s! You won $${winnings}!`;
+      msg.innerText = `🔥 Triple 7s! You won $${winnings.toFixed(2)}!`;
     } else if (slot1 === slot2 && slot2 === slot3) {
       winnings = bet * 3.5;
       msg.innerText = `🎉 Jackpot! You won $${winnings.toFixed(2)}!`;
     } else if (slot1 === slot2 || slot2 === slot3 || slot1 === '7️⃣') {
       winnings = bet * 2;
-      msg.innerText = `😊 Nice! You won $${winnings}!`;
+      msg.innerText = `😊 Nice! You won $${winnings.toFixed(2)}!`;
     } else {
       msg.innerText = '🙁 Try again!';
     }
@@ -455,6 +441,21 @@
     balance += winnings;
     updateBalance();
     saveGame();
+  }
+
+  // --- NEW Auto Spin FUNCTIONALITY ---
+  function toggleAutoSpin() {
+    const autoSpinBtn = document.getElementById('autoSpinBtn');
+    if (autoSpinInterval) {
+      clearInterval(autoSpinInterval);
+      autoSpinInterval = null;
+      autoSpinBtn.innerText = 'Auto Spin';
+      autoSpinBtn.style.background = '';
+    } else {
+      autoSpinInterval = setInterval(spin, 2500); // Spins every 2.5 seconds
+      autoSpinBtn.innerText = 'Stop Auto Spin';
+      autoSpinBtn.style.background = '#6c3';
+    }
   }
 
   function getBoostMultiplier() {
@@ -513,19 +514,15 @@
 
   function showBuyGiftCodePopup() {
     const priceTextElement = document.getElementById('buyGiftCodePrice');
-    
     if (balance <= 0) {
       document.getElementById('buyGiftCodeMessage').innerText = `❌ You don't have any money to buy a gift code!`;
       document.getElementById('buyGiftCodePopup').style.display = 'flex';
       return;
     }
-
     const randomPercentage = Math.floor(Math.random() * (90 - 25 + 1)) + 25;
     const price = balance * (randomPercentage / 100);
-
     priceTextElement.dataset.price = price;
     priceTextElement.innerText = `Price: $${price.toFixed(2)} (${randomPercentage}%)`;
-    
     document.getElementById('buyGiftCodePopup').style.display = 'flex';
   }
   
@@ -537,41 +534,32 @@
   function buyGiftCode() {
     const priceTextElement = document.getElementById('buyGiftCodePrice');
     const price = parseFloat(priceTextElement.dataset.price);
-    
     if (balance <= 0 || balance < price) {
       document.getElementById('buyGiftCodeMessage').innerText = `❌ Not enough money! You need $${price.toFixed(2)}.`;
       return;
     }
-    
     balance -= price;
     updateBalance();
-
     const newCode = Math.random().toString(36).substring(2, 10).toUpperCase();
     const successChance = Math.floor(Math.random() * 70) + 10;
-
     boughtGiftCodes.set(newCode, successChance);
-    
     document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${price.toFixed(2)}!
     It has a ${successChance}% chance of working.
     Code: ${newCode}`;
-    
     saveGame();
   }
 
   function redeemGiftCode() {
     const code = document.getElementById('giftCodeInput').value.trim().toLowerCase();
     const messageElement = document.getElementById('giftCodeMessage');
-    
     if (blockedWords.has(code)) {
       messageElement.innerText = "❌ That code is invalid.";
       return;
     }
-    
     if (usedGiftCodes.has(code)) {
       messageElement.innerText = "❌ You have already redeemed this code!";
       return;
     }
-
     const dailyCode = "dailygift";
     if (code === dailyCode) {
       balance += 1000;
@@ -581,20 +569,16 @@
       messageElement.innerText = `🎉 Success! You received $1000!`;
       return;
     }
-
     const upperCaseCode = code.toUpperCase();
     if (boughtGiftCodes.has(upperCaseCode)) {
       const successChance = boughtGiftCodes.get(upperCaseCode);
       const randomRoll = Math.floor(Math.random() * 100) + 1;
-      
       boughtGiftCodes.delete(upperCaseCode);
       usedGiftCodes.add(upperCaseCode);
       saveGame();
-
       if (randomRoll <= successChance) {
         let rewardText = "";
         const rewardType = getRandomReward();
-
         if (rewardType.startsWith('money_')) {
           const amount = parseInt(rewardType.split('_')[1]);
           balance += amount;
@@ -609,7 +593,6 @@
           boughtGiftCodes.set(newGiftCode, newSuccessChance);
           rewardText = `You received a new gift code with a ${newSuccessChance}% chance! Code: ${newGiftCode}`;
         }
-        
         updateBalance();
         updateInventory();
         messageElement.innerText = `🎉 Success! The code worked! ${rewardText}`;
@@ -619,7 +602,6 @@
         return;
       }
     }
-
     messageElement.innerText = "❌ Invalid or expired gift code.";
   }
 
