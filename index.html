@@ -67,11 +67,55 @@
       padding: 10px;
       cursor: pointer;
     }
+    
+    /* Gift code button */
+    #giftCodeBtn {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 9999;
+      background: #555;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    /* Popup container */
+    .popup-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+
+    .popup-content {
+      background: #333;
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    .popup-content h2 {
+      margin-top: 0;
+    }
+
+    .popup-content input {
+      width: 250px;
+    }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js"></script>
 </head>
 <body>
 
-<!-- 🎵 Hidden YouTube Audio Player -->
 <div id="yt-audio" style="width:1;height:1;overflow:hidden;">
   <iframe
     id="yt-player"
@@ -83,10 +127,21 @@
   ></iframe>
 </div>
 
-<!-- 🔇 Mute/Unmute Button -->
 <button id="audioToggle" onclick="toggleAudio()">🔇 Unmute</button>
 
-<!-- Start Screen -->
+<button id="giftCodeBtn" onclick="showGiftCodePopup()">🎁 Gift Code</button>
+
+<div id="giftCodePopup" class="popup-container" style="display: none;">
+  <div class="popup-content">
+    <h2>🎁 Enter Gift Code</h2>
+    <input type="text" id="giftCodeInput" placeholder="Enter code here">
+    <br>
+    <button onclick="redeemGiftCode()">Redeem</button>
+    <button onclick="hideGiftCodePopup()">Close</button>
+    <p id="giftCodeMessage"></p>
+  </div>
+</div>
+
 <div id="start-screen" style="text-align:center; margin-top:100px;">
   <h2>🎮 Welcome to the Casino</h2>
   <button onclick="startNewGame()">Start New Game</button>
@@ -98,7 +153,6 @@
   </div>
 </div>
 
-<!-- Game Content -->
 <div id="game-content" style="display:none;">
   <h1>🎰 Casino Slot Machine</h1>
 
@@ -129,15 +183,19 @@
 
   <div>
     <h3>💾 Save Code:</h3>
-    <div id="saveCodeDisplay" style="font-size: 0.8em; color: #aaa;"></div>
+    <div id="saveCodeDisplay" style="font-size: 0.8em; color: #aaa; word-break: break-all;"></div>
   </div>
 </div>
 
 <script>
   let balance = 100;
   let inventory = {};
+  let usedGiftCodes = new Set();
   const symbols = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
   let isMuted = true;
+  const SECRET_SAVE_KEY = 'aSuperSecureSaveKey123'; // ⚠️ IMPORTANT: Change this to a long, random string.
+  const SECRET_GIFT_KEY = 'aSuperSecureGiftKey456'; // ⚠️ IMPORTANT: Change this to a long, random string.
+
 
   const shopItems = {
     "Lucky Charm": { base: 50, price: 50 },
@@ -163,6 +221,7 @@
   function startNewGame() {
     balance = 100;
     inventory = {};
+    usedGiftCodes = new Set();
     showGameScreen();
   }
 
@@ -170,28 +229,39 @@
     document.getElementById('load-screen').style.display = 'block';
   }
 
+  // New Save System: Load
   function loadPreviousGame() {
     const codeInput = document.getElementById("loadCodeInput").value.trim();
     let data = null;
 
     try {
-      if (codeInput) {
-        data = JSON.parse(atob(codeInput));
-      } else {
-        const saved = localStorage.getItem("casinoSave");
-        if (saved) data = JSON.parse(saved);
+      const codeToLoad = codeInput || localStorage.getItem("casinoSave");
+      if (!codeToLoad) throw new Error("No save data found");
+      
+      const [encodedData, signature] = codeToLoad.split(':');
+      if (!encodedData || !signature) throw new Error("Invalid save format");
+
+      const decodedData = atob(encodedData);
+      const expectedSignature = sha256.hmac(SECRET_SAVE_KEY, decodedData);
+
+      if (signature !== expectedSignature) {
+        throw new Error("Invalid or corrupted save code!");
       }
 
-      if (!data || !("balance" in data) || !("inventory" in data)) {
+      data = JSON.parse(decodedData);
+
+      if (!("balance" in data) || !("inventory" in data) || !("usedGiftCodes" in data)) {
         throw new Error("Invalid save data");
       }
 
       balance = data.balance;
       inventory = data.inventory;
+      usedGiftCodes = new Set(data.usedGiftCodes);
+
       showGameScreen();
 
     } catch (e) {
-      alert("❌ Invalid or corrupted save code!");
+      alert(`❌ Error loading game: ${e.message}`);
     }
   }
 
@@ -265,6 +335,11 @@
 
     const itemName = items[0];
     const price = shopItems[itemName].price;
+
+    if (inventory[itemName] <= 0) {
+      alert("You don't have this item to sell!");
+      return;
+    }
 
     inventory[itemName]--;
     if (inventory[itemName] <= 0) delete inventory[itemName];
@@ -340,20 +415,63 @@
     return Math.min(multiplier, 0.7);
   }
 
+  // New Save System: Save
   function saveGame() {
     const state = {
       balance: balance,
-      inventory: inventory
+      inventory: inventory,
+      usedGiftCodes: Array.from(usedGiftCodes)
     };
-    const code = btoa(JSON.stringify(state));
+    const stateString = JSON.stringify(state);
+    const signature = sha256.hmac(SECRET_SAVE_KEY, stateString);
+    const code = btoa(stateString) + ':' + signature;
     document.getElementById('saveCodeDisplay').innerText = code;
-    localStorage.setItem("casinoSave", JSON.stringify(state));
+    localStorage.setItem("casinoSave", code);
   }
 
   function schedulePriceUpdate() {
     updateMarketPrices();
     setTimeout(schedulePriceUpdate, 5000 + Math.random() * 5000);
   }
+
+  // New Gift Code System
+  function showGiftCodePopup() {
+    document.getElementById('giftCodePopup').style.display = 'flex';
+  }
+
+  function hideGiftCodePopup() {
+    document.getElementById('giftCodePopup').style.display = 'none';
+    document.getElementById('giftCodeInput').value = '';
+    document.getElementById('giftCodeMessage').innerText = '';
+  }
+
+  function redeemGiftCode() {
+    const code = document.getElementById('giftCodeInput').value.trim();
+    const messageElement = document.getElementById('giftCodeMessage');
+    
+    if (usedGiftCodes.has(code)) {
+      messageElement.innerText = "❌ You have already redeemed this code!";
+      return;
+    }
+
+    // This is the "server-side" logic. You can hardcode codes here or generate them.
+    // For this example, let's have one hardcoded gift code.
+    const today = new Date().toISOString().slice(0, 10);
+    const dailyReward = 1000;
+    const dailyCodeData = `reward:${dailyReward}|date:${today}`;
+    const validDailyCode = sha256.hmac(SECRET_GIFT_KEY, dailyCodeData);
+
+    if (code === validDailyCode) {
+      balance += dailyReward;
+      usedGiftCodes.add(code);
+      updateBalance();
+      saveGame();
+      messageElement.innerText = `🎉 Success! You received $${dailyReward}!`;
+    } else {
+      messageElement.innerText = "❌ Invalid gift code.";
+    }
+  }
+
 </script>
 
 </body>
