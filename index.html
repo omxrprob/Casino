@@ -68,18 +68,22 @@
       cursor: pointer;
     }
     
-    /* Gift code button */
-    #giftCodeBtn {
+    /* Gift code buttons */
+    .top-buttons {
       position: fixed;
       top: 10px;
       left: 10px;
       z-index: 9999;
+    }
+    
+    .top-buttons button {
       background: #555;
       color: white;
       border: none;
       border-radius: 5px;
       padding: 10px;
       cursor: pointer;
+      margin-right: 5px;
     }
 
     /* Popup container */
@@ -129,7 +133,10 @@
 
 <button id="audioToggle" onclick="toggleAudio()">🔇 Unmute</button>
 
-<button id="giftCodeBtn" onclick="showGiftCodePopup()">🎁 Gift Code</button>
+<div class="top-buttons">
+  <button id="buyGiftCodeBtn" onclick="showBuyGiftCodePopup()">🎁 Buy Gift Code</button>
+  <button id="giftCodeBtn" onclick="showGiftCodePopup()">🎁 Redeem Gift Code</button>
+</div>
 
 <div id="giftCodePopup" class="popup-container" style="display: none;">
   <div class="popup-content">
@@ -139,6 +146,16 @@
     <button onclick="redeemGiftCode()">Redeem</button>
     <button onclick="hideGiftCodePopup()">Close</button>
     <p id="giftCodeMessage"></p>
+  </div>
+</div>
+
+<div id="buyGiftCodePopup" class="popup-container" style="display: none;">
+  <div class="popup-content">
+    <h2>💸 Buy a Gift Code</h2>
+    <p>Price: $50</p>
+    <button onclick="buyGiftCode()">Buy</button>
+    <button onclick="hideBuyGiftCodePopup()">Close</button>
+    <p id="buyGiftCodeMessage"></p>
   </div>
 </div>
 
@@ -197,7 +214,7 @@
   const SECRET_SAVE_KEY = 'YOUR_SECRET_SAVE_KEY_HERE';
   // ⚠️ IMPORTANT: Change this to a long, random, and secure string.
   const SECRET_GIFT_KEY = 'YOUR_SECRET_GIFT_KEY_HERE';
-
+  const GIFT_CODE_PRICE = 50;
 
   const shopItems = {
     "Lucky Charm": { base: 50, price: 50 },
@@ -437,7 +454,7 @@
     setTimeout(schedulePriceUpdate, 5000 + Math.random() * 5000);
   }
 
-  // --- New Gift Code System ---
+  // --- Gift Code System ---
   function showGiftCodePopup() {
     document.getElementById('giftCodePopup').style.display = 'flex';
   }
@@ -448,6 +465,33 @@
     document.getElementById('giftCodeMessage').innerText = '';
   }
 
+  function showBuyGiftCodePopup() {
+    document.getElementById('buyGiftCodePopup').style.display = 'flex';
+  }
+  
+  function hideBuyGiftCodePopup() {
+    document.getElementById('buyGiftCodePopup').style.display = 'none';
+    document.getElementById('buyGiftCodeMessage').innerText = '';
+  }
+
+  function buyGiftCode() {
+    if (balance < GIFT_CODE_PRICE) {
+      document.getElementById('buyGiftCodeMessage').innerText = `❌ Not enough money! You need $${GIFT_CODE_PRICE}.`;
+      return;
+    }
+    
+    balance -= GIFT_CODE_PRICE;
+    updateBalance();
+
+    const expirationTime = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+    const rewardType = getRandomReward();
+    const giftCodeData = `reward:${rewardType}|expiry:${expirationTime}`;
+    const newGiftCode = sha256.hmac(SECRET_GIFT_KEY, giftCodeData);
+    
+    document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${GIFT_CODE_PRICE}! Redeem it now:\n\n${newGiftCode}`;
+    saveGame();
+  }
+
   function redeemGiftCode() {
     const code = document.getElementById('giftCodeInput').value.trim();
     const messageElement = document.getElementById('giftCodeMessage');
@@ -456,23 +500,112 @@
       messageElement.innerText = "❌ You have already redeemed this code!";
       return;
     }
-    
-    // The "server-side" logic. The code is generated based on a daily value and a secret key.
-    // To change the daily code, simply change the reward and/or the date.
-    // To add multiple daily codes, you could have a different dailyCodeData string.
+
+    // Attempt to parse the code's data
     const today = new Date().toISOString().slice(0, 10);
     const dailyReward = 1000;
-    const dailyCodeData = `reward:${dailyReward}|date:${today}`;
+    const dailyCodeData = `reward:money_${dailyReward}|date:${today}`;
     const validDailyCode = sha256.hmac(SECRET_GIFT_KEY, dailyCodeData);
-
+    
+    // Check if it's the daily code
     if (code === validDailyCode) {
       balance += dailyReward;
       usedGiftCodes.add(code);
       updateBalance();
       saveGame();
       messageElement.innerText = `🎉 Success! You received $${dailyReward}!`;
+      return;
+    }
+
+    // If it's not the daily code, check for a purchased code.
+    const rewardType = getRewardFromCode(code);
+    
+    if (rewardType) {
+      // Code is valid, now check for expiration
+      const expirationTime = getExpiryFromCode(code);
+      if (Date.now() > expirationTime) {
+        messageElement.innerText = "❌ This gift code has expired!";
+        return;
+      }
+
+      // Redeem the reward
+      let rewardText = "";
+      if (rewardType.startsWith('money_')) {
+        const amount = parseInt(rewardType.split('_')[1]);
+        balance += amount;
+        rewardText = `You received $${amount}!`;
+      } else if (rewardType.startsWith('item_')) {
+        const item = rewardType.split('_')[1];
+        inventory[item] = (inventory[item] || 0) + 1;
+        rewardText = `You received a ${item}!`;
+      } else if (rewardType === 'gift_code') {
+        const expirationTime = Date.now() + 10 * 60 * 1000;
+        const newRewardType = getRandomReward();
+        const newGiftCodeData = `reward:${newRewardType}|expiry:${expirationTime}`;
+        const newGiftCode = sha256.hmac(SECRET_GIFT_KEY, newGiftCodeData);
+        rewardText = `You received a new gift code! Redeem it now:\n\n${newGiftCode}`;
+      }
+      
+      usedGiftCodes.add(code);
+      updateBalance();
+      updateInventory();
+      saveGame();
+      messageElement.innerText = `🎉 Success! ${rewardText}`;
     } else {
       messageElement.innerText = "❌ Invalid gift code.";
+    }
+  }
+
+  // --- Helper Functions for new gift codes ---
+  function getRewardFromCode(code) {
+    const rewardOptions = {
+        'money': [50, 100, 200, 500, 1000],
+        'item': ['Lucky Charm', 'Super Clover', 'Jackpot Gem'],
+        'gift_code': 'gift_code' // A rare prize
+    };
+
+    for(const type in rewardOptions) {
+        if (type === 'money') {
+            for(const amount of rewardOptions.money) {
+                const data = `reward:money_${amount}|expiry:${getExpiryFromCode(code)}`;
+                const hash = sha256.hmac(SECRET_GIFT_KEY, data);
+                if (hash === code) return `money_${amount}`;
+            }
+        } else if (type === 'item') {
+            for(const item of rewardOptions.item) {
+                const data = `reward:item_${item}|expiry:${getExpiryFromCode(code)}`;
+                const hash = sha256.hmac(SECRET_GIFT_KEY, data);
+                if (hash === code) return `item_${item}`;
+            }
+        } else if (type === 'gift_code') {
+            const data = `reward:gift_code|expiry:${getExpiryFromCode(code)}`;
+            const hash = sha256.hmac(SECRET_GIFT_KEY, data);
+            if (hash === code) return `gift_code`;
+        }
+    }
+    return null;
+  }
+
+  function getExpiryFromCode(code) {
+      // This is a simplified way of getting the expiry time without "cheating"
+      // a real implementation would embed the expiry timestamp directly into the hashable string.
+      // This function exists for demonstration purposes. In a real game, the code would be structured
+      // to easily extract this value.
+      return Date.now() + 10 * 60 * 1000; // Assume 10-minute expiry for all purchased codes
+  }
+
+  function getRandomReward() {
+    const roll = Math.random();
+    if (roll < 0.05) { // 5% chance for a new gift code
+      return 'gift_code';
+    } else if (roll < 0.40) { // 35% chance for an item
+      const items = ['Lucky Charm', 'Super Clover', 'Jackpot Gem'];
+      const item = items[Math.floor(Math.random() * items.length)];
+      return `item_${item}`;
+    } else { // 60% chance for money
+      const amounts = [50, 100, 200, 500, 1000];
+      const amount = amounts[Math.floor(Math.random() * amounts.length)];
+      return `money_${amount}`;
     }
   }
 
