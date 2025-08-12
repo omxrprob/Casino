@@ -152,7 +152,7 @@
 <div id="buyGiftCodePopup" class="popup-container" style="display: none;">
   <div class="popup-content">
     <h2>💸 Buy a Gift Code</h2>
-    <p>Price: $50</p>
+    <p id="buyGiftCodePrice">Price: $50</p>
     <button onclick="buyGiftCode()">Buy</button>
     <button onclick="hideBuyGiftCodePopup()">Close</button>
     <p id="buyGiftCodeMessage"></p>
@@ -212,12 +212,11 @@
   let isMuted = true;
   // ⚠️ IMPORTANT: Change this to a long, random, and secure string.
   const SECRET_SAVE_KEY = 'YOUR_SECRET_SAVE_KEY_HERE';
-  const GIFT_CODE_PRICE = 50;
 
   // New map to store bought gift codes and their success chance
   let boughtGiftCodes = new Map();
 
-  // --- NEW: Blocked words list ---
+  // --- Blocked words list ---
   const blockedWords = new Set([
     "fuck", "shit", "ass", "bitch", "cunt",
     "money", "gift", "code", "jackpot",
@@ -473,6 +472,16 @@
   }
 
   function showBuyGiftCodePopup() {
+    const priceTextElement = document.getElementById('buyGiftCodePrice');
+    
+    // Calculate a random percentage (25% to 90%)
+    const randomPercentage = Math.floor(Math.random() * (90 - 25 + 1)) + 25;
+    const price = Math.round(balance * (randomPercentage / 100));
+
+    // Store the price in a data attribute to use when buying
+    priceTextElement.dataset.price = price;
+    priceTextElement.innerText = `Price: $${price} (${randomPercentage}%)`;
+    
     document.getElementById('buyGiftCodePopup').style.display = 'flex';
   }
   
@@ -482,12 +491,15 @@
   }
 
   function buyGiftCode() {
-    if (balance < GIFT_CODE_PRICE) {
-      document.getElementById('buyGiftCodeMessage').innerText = `❌ Not enough money! You need $${GIFT_CODE_PRICE}.`;
+    const priceTextElement = document.getElementById('buyGiftCodePrice');
+    const price = parseInt(priceTextElement.dataset.price, 10);
+    
+    if (balance < price) {
+      document.getElementById('buyGiftCodeMessage').innerText = `❌ Not enough money! You need $${price}.`;
       return;
     }
     
-    balance -= GIFT_CODE_PRICE;
+    balance -= price;
     updateBalance();
 
     const newCode = Math.random().toString(36).substring(2, 10).toUpperCase(); // A unique random string
@@ -496,7 +508,7 @@
     // Store the code and its success chance
     boughtGiftCodes.set(newCode, successChance);
     
-    document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${GIFT_CODE_PRICE}!
+    document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${price}!
     It has a ${successChance}% chance of working.
     Code: ${newCode}`;
     
@@ -507,7 +519,7 @@
     const code = document.getElementById('giftCodeInput').value.trim().toLowerCase();
     const messageElement = document.getElementById('giftCodeMessage');
     
-    // --- NEW: Check for blocked words first ---
+    // --- Check for blocked words first ---
     if (blockedWords.has(code)) {
       messageElement.innerText = "❌ That code is invalid.";
       return;
