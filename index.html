@@ -133,8 +133,8 @@
 <button id="audioToggle" onclick="toggleAudio()">🔇 Unmute</button>
 
 <div class="top-buttons">
-  <button id="buyGiftCodeBtn" onclick="showBuyGiftCodePopup()">🎁 Buy Gift Code</button>
-  <button id="giftCodeBtn" onclick="showGiftCodePopup()">🎁 Redeem Gift Code</button>
+  <button id="buyGiftCodeBtn" onclick="showBuyGiftCodePopup(); playClickSound()">🎁 Buy Gift Code</button>
+  <button id="giftCodeBtn" onclick="showGiftCodePopup(); playClickSound()">🎁 Redeem Gift Code</button>
 </div>
 
 <div id="giftCodePopup" class="popup-container" style="display: none;">
@@ -142,8 +142,8 @@
     <h2>🎁 Enter Gift Code</h2>
     <input type="text" id="giftCodeInput" placeholder="Enter code here">
     <br>
-    <button onclick="redeemGiftCode()">Redeem</button>
-    <button onclick="hideGiftCodePopup()">Close</button>
+    <button onclick="redeemGiftCode(); playClickSound()">Redeem</button>
+    <button onclick="hideGiftCodePopup(); playClickSound()">Close</button>
     <p id="giftCodeMessage"></p>
   </div>
 </div>
@@ -152,20 +152,20 @@
   <div class="popup-content">
     <h2>💸 Buy a Gift Code</h2>
     <p id="buyGiftCodePrice">Price: $50</p>
-    <button onclick="buyGiftCode()">Buy</button>
-    <button onclick="hideBuyGiftCodePopup()">Close</button>
+    <button onclick="buyGiftCode(); playClickSound()">Buy</button>
+    <button onclick="hideBuyGiftCodePopup(); playClickSound()">Close</button>
     <p id="buyGiftCodeMessage"></p>
   </div>
 </div>
 
 <div id="start-screen" style="text-align:center; margin-top:100px;">
   <h2>🎮 Welcome to the Casino</h2>
-  <button onclick="startNewGame()">Start New Game</button>
-  <button onclick="toggleLoadInput()">Play Previous Game</button>
+  <button onclick="startNewGame(); playClickSound()">Start New Game</button>
+  <button onclick="toggleLoadInput(); playClickSound()">Play Previous Game</button>
 
   <div id="load-screen" style="display:none; margin-top: 20px;">
     <input type="text" id="loadCodeInput" placeholder="Paste save code (optional)">
-    <button onclick="loadPreviousGame()">Load Game</button>
+    <button onclick="loadPreviousGame(); playClickSound()">Load Game</button>
   </div>
 </div>
 
@@ -175,8 +175,8 @@
   <div>
     <label for="betAmount">Bet Amount:</label>
     <input type="text" id="betAmount" value="10">
-    <button onclick="spin()">Spin</button>
-    <button id="autoSpinBtn" onclick="toggleAutoSpin()">Auto Spin: OFF</button>
+    <button onclick="spin(); playClickSound()">Spin</button>
+    <button id="autoSpinBtn" onclick="toggleAutoSpin(); playClickSound()">Auto Spin: OFF</button>
   </div>
   <div>
     <label for="autoSpinDelay">Auto Spin Delay (seconds):</label>
@@ -197,8 +197,8 @@
     <h2>🛒 Market</h2>
     <div>
       <select id="shopItem"></select>
-      <button onclick="buyItem()">Buy</button>
-      <button onclick="sellItem()">Sell</button>
+      <button onclick="buyItem(); playClickSound()">Buy</button>
+      <button onclick="sellItem(); playClickSound()">Sell</button>
     </div>
     <div id="inventory">Inventory: (empty)</div>
   </div>
@@ -206,7 +206,7 @@
   <div>
     <h3>💾 Save Code:</h3>
     <div id="saveCodeDisplay" style="font-size: 0.8em; color: #aaa; word-break: break-all; display: inline-block;"></div>
-    <button id="copySaveCodeBtn" onclick="copySaveCode()">Copy</button>
+    <button id="copySaveCodeBtn" onclick="copySaveCode(); playClickSound()">Copy</button>
   </div>
 </div>
 
@@ -234,6 +234,17 @@
   let player;
   let autoSpinInterval = null;
 
+  // NEW: Audio object for button click sound
+  const clickSound = new Audio('https://cdn.pixabay.com/audio/2022/03/10/button-124474.mp3');
+  
+  // NEW: Function to play the click sound
+  function playClickSound() {
+    if (!isMuted) {
+      clickSound.currentTime = 0; // Rewind to the start
+      clickSound.play();
+    }
+  }
+
   function onYouTubeIframeAPIReady() {
     player = new YT.Player('yt-player', {
       height: '0',
@@ -258,6 +269,7 @@
 
   function toggleAudio() {
     const button = document.getElementById("audioToggle");
+    // playClickSound() is now called from the button's onclick attribute
     if (isMuted) {
       player.unMute();
       player.playVideo();
@@ -586,7 +598,6 @@
       saveGame();
       if (randomRoll <= successChance) {
         let rewardText = "";
-        // UPDATED: Now passing the current balance to the reward function
         const reward = getRandomReward(balance);
         if (reward.type === 'money') {
           balance += reward.amount;
@@ -612,7 +623,6 @@
     messageElement.innerText = "❌ Invalid or expired gift code.";
   }
 
-  // UPDATED: Now takes the current balance to scale rewards
   function getRandomReward(currentBalance) {
     const roll = Math.random();
 
@@ -622,7 +632,6 @@
       const items = ['Lucky Charm', 'Super Clover', 'Jackpot Gem'];
       const chosenItem = items[Math.floor(Math.random() * items.length)];
       
-      // Scale number of items based on balance
       let itemCount = 1;
       if (currentBalance > 2000) { itemCount = 2; }
       if (currentBalance > 5000) { itemCount = 3; }
@@ -631,7 +640,6 @@
       return { type: 'item', name: chosenItem, count: itemCount };
     } else { // 60% chance
       let rewardAmount;
-      // Scale money reward based on balance
       if (currentBalance < 500) { 
         rewardAmount = Math.floor(Math.random() * 400) + 100;
       } else if (currentBalance < 2000) { 
