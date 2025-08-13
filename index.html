@@ -216,8 +216,6 @@
   let usedGiftCodes = new Set();
   const symbols = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
   let isMuted = true;
-  // NOTE: This key is no longer used for save codes, but it's good to keep
-  // if you want to re-implement the security feature later.
   const SECRET_SAVE_KEY = 'YOUR_SECRET_SAVE_KEY_HERE';
 
   let boughtGiftCodes = new Map();
@@ -289,7 +287,6 @@
       const codeToLoad = codeInput || localStorage.getItem("casinoSave");
       if (!codeToLoad) throw new Error("No save data found");
       
-      // --- UPDATED LOGIC: No more signature check ---
       const decodedData = atob(codeToLoad);
       const data = JSON.parse(decodedData);
       
@@ -489,7 +486,6 @@
       usedGiftCodes: Array.from(usedGiftCodes)
     };
     const stateString = JSON.stringify(state);
-    // --- UPDATED LOGIC: Save code is now just the base64-encoded string ---
     const code = btoa(stateString);
     document.getElementById('saveCodeDisplay').innerText = code;
     localStorage.setItem("casinoSave", code);
@@ -590,16 +586,15 @@
       saveGame();
       if (randomRoll <= successChance) {
         let rewardText = "";
-        const rewardType = getRandomReward();
-        if (rewardType.startsWith('money_')) {
-          const amount = parseInt(rewardType.split('_')[1]);
-          balance += amount;
-          rewardText = `You received $${amount}!`;
-        } else if (rewardType.startsWith('item_')) {
-          const item = rewardType.split('_')[1];
-          inventory[item] = (inventory[item] || 0) + 1;
-          rewardText = `You received a ${item}!`;
-        } else if (rewardType === 'gift_code') {
+        // UPDATED: Now passing the current balance to the reward function
+        const reward = getRandomReward(balance);
+        if (reward.type === 'money') {
+          balance += reward.amount;
+          rewardText = `You received $${reward.amount}!`;
+        } else if (reward.type === 'item') {
+          inventory[reward.name] = (inventory[reward.name] || 0) + reward.count;
+          rewardText = `You received ${reward.count} x ${reward.name}!`;
+        } else if (reward.type === 'gift_code') {
           const newGiftCode = Math.random().toString(36).substring(2, 10).toUpperCase();
           const newSuccessChance = Math.floor(Math.random() * 70) + 10;
           boughtGiftCodes.set(newGiftCode, newSuccessChance);
@@ -617,18 +612,36 @@
     messageElement.innerText = "❌ Invalid or expired gift code.";
   }
 
-  function getRandomReward() {
+  // UPDATED: Now takes the current balance to scale rewards
+  function getRandomReward(currentBalance) {
     const roll = Math.random();
-    if (roll < 0.05) {
-      return 'gift_code';
-    } else if (roll < 0.40) {
+
+    if (roll < 0.05) { // 5% chance
+      return { type: 'gift_code' };
+    } else if (roll < 0.40) { // 35% chance
       const items = ['Lucky Charm', 'Super Clover', 'Jackpot Gem'];
-      const item = items[Math.floor(Math.random() * items.length)];
-      return `item_${item}`;
-    } else {
-      const amounts = [50, 100, 200, 500, 1000];
-      const amount = amounts[Math.floor(Math.random() * amounts.length)];
-      return `money_${amount}`;
+      const chosenItem = items[Math.floor(Math.random() * items.length)];
+      
+      // Scale number of items based on balance
+      let itemCount = 1;
+      if (currentBalance > 2000) { itemCount = 2; }
+      if (currentBalance > 5000) { itemCount = 3; }
+      if (currentBalance > 10000) { itemCount = 5; }
+      
+      return { type: 'item', name: chosenItem, count: itemCount };
+    } else { // 60% chance
+      let rewardAmount;
+      // Scale money reward based on balance
+      if (currentBalance < 500) { 
+        rewardAmount = Math.floor(Math.random() * 400) + 100;
+      } else if (currentBalance < 2000) { 
+        rewardAmount = Math.floor(Math.random() * 1500) + 500;
+      } else if (currentBalance < 10000) { 
+        rewardAmount = Math.floor(Math.random() * 8000) + 2000;
+      } else { 
+        rewardAmount = Math.floor(Math.random() * 40000) + 10000;
+      }
+      return { type: 'money', amount: rewardAmount };
     }
   }
 </script>
