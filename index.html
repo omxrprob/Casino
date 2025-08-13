@@ -216,7 +216,8 @@
   let usedGiftCodes = new Set();
   const symbols = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
   let isMuted = true;
-  // ⚠️ IMPORTANT: Change this to a long, random, and secure string.
+  // NOTE: This key is no longer used for save codes, but it's good to keep
+  // if you want to re-implement the security feature later.
   const SECRET_SAVE_KEY = 'YOUR_SECRET_SAVE_KEY_HERE';
 
   let boughtGiftCodes = new Map();
@@ -287,14 +288,11 @@
     try {
       const codeToLoad = codeInput || localStorage.getItem("casinoSave");
       if (!codeToLoad) throw new Error("No save data found");
-      const [encodedData, signature] = codeToLoad.split(':');
-      if (!encodedData || !signature) throw new Error("Invalid save format");
-      const decodedData = atob(encodedData);
-      const expectedSignature = sha256.hmac(SECRET_SAVE_KEY, decodedData);
-      if (signature !== expectedSignature) {
-        throw new Error("Invalid or corrupted save code!");
-      }
+      
+      // --- UPDATED LOGIC: No more signature check ---
+      const decodedData = atob(codeToLoad);
       const data = JSON.parse(decodedData);
+      
       if (!("balance" in data) || !("inventory" in data) || !("usedGiftCodes" in data) || !("boughtGiftCodes" in data)) {
         throw new Error("Invalid save data structure");
       }
@@ -304,7 +302,7 @@
       boughtGiftCodes = new Map(data.boughtGiftCodes);
       showGameScreen();
     } catch (e) {
-      alert(`❌ Error loading game: ${e.message}\nMake sure your SECRET_SAVE_KEY is correct.`);
+      alert(`❌ Error loading game: ${e.message}`);
     }
   }
 
@@ -408,7 +406,6 @@
 
     if (balance < bet) {
       msg.innerText = 'Not enough balance!';
-      // If auto-spin is on, stop it to prevent infinite errors
       if (autoSpinInterval) {
         toggleAutoSpin();
       }
@@ -492,8 +489,8 @@
       usedGiftCodes: Array.from(usedGiftCodes)
     };
     const stateString = JSON.stringify(state);
-    const signature = sha256.hmac(SECRET_SAVE_KEY, stateString);
-    const code = btoa(stateString) + ':' + signature;
+    // --- UPDATED LOGIC: Save code is now just the base64-encoded string ---
+    const code = btoa(stateString);
     document.getElementById('saveCodeDisplay').innerText = code;
     localStorage.setItem("casinoSave", code);
   }
