@@ -304,7 +304,7 @@
       boughtGiftCodes = new Map(data.boughtGiftCodes);
       showGameScreen();
     } catch (e) {
-      alert(`❌ Error loading game: ${e.message}`);
+      alert(`❌ Error loading game: ${e.message}\nMake sure your SECRET_SAVE_KEY is correct.`);
     }
   }
 
@@ -456,7 +456,6 @@
     const delayInput = document.getElementById('autoSpinDelay');
     let delay = parseFloat(delayInput.value) * 1000;
 
-    // UPDATED: Changed validation to allow for a lower minimum delay
     if (isNaN(delay) || delay < 100) {
       alert("Please enter a valid delay (minimum 0.1 seconds).");
       return;
