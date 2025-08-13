@@ -120,7 +120,6 @@
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js"></script>
-
   <script src="https://www.youtube.com/iframe_api"></script>
 
 </head>
@@ -158,14 +157,14 @@
   </div>
 </div>
 
-<div id="start-screen" style="text-align:center; margin-top:100px;">
+<div id="intro-screen" style="text-align:center; margin-top:100px;">
   <h2>🎮 Welcome to the Casino</h2>
-  <button onclick="startNewGame(); playClickSound()">Start New Game</button>
+  <p>Click below to start playing and enable sound!</p>
+  <button onclick="startGameWithAudio('new')">Start New Game</button>
   <button onclick="toggleLoadInput(); playClickSound()">Play Previous Game</button>
-
   <div id="load-screen" style="display:none; margin-top: 20px;">
     <input type="text" id="loadCodeInput" placeholder="Paste save code (optional)">
-    <button onclick="loadPreviousGame(); playClickSound()">Load Game</button>
+    <button onclick="startGameWithAudio('load'); playClickSound()">Load Game</button>
   </div>
 </div>
 
@@ -234,13 +233,11 @@
   let player;
   let autoSpinInterval = null;
 
-  // NEW: Audio object for button click sound
   const clickSound = new Audio('https://cdn.pixabay.com/audio/2022/03/10/button-124474.mp3');
   
-  // NEW: Function to play the click sound
   function playClickSound() {
     if (!isMuted) {
-      clickSound.currentTime = 0; // Rewind to the start
+      clickSound.currentTime = 0;
       clickSound.play();
     }
   }
@@ -256,7 +253,7 @@
         'controls': 0,
         'disablekb': 1,
         'modestbranding': 1,
-        'mute': 1,
+        'mute': 1, // Start muted by default
         'playlist': '2J4jD60K01M'
       },
       events: {
@@ -269,16 +266,33 @@
 
   function toggleAudio() {
     const button = document.getElementById("audioToggle");
-    // playClickSound() is now called from the button's onclick attribute
     if (isMuted) {
       player.unMute();
-      player.playVideo();
       button.innerText = "🔊 Mute";
     } else {
       player.mute();
       button.innerText = "🔇 Unmute";
     }
     isMuted = !isMuted;
+    playClickSound(); // The toggle button itself has a sound
+  }
+  
+  // NEW: Function to handle the first user interaction
+  function startGameWithAudio(mode) {
+    if (mode === 'new') {
+      startNewGame();
+    } else if (mode === 'load') {
+      loadPreviousGame();
+    }
+    
+    // This is the crucial part that enables audio
+    player.unMute();
+    isMuted = false;
+    document.getElementById("audioToggle").innerText = "🔊 Mute";
+    playClickSound();
+    
+    document.getElementById('intro-screen').style.display = 'none';
+    document.getElementById('game-content').style.display = 'block';
   }
 
   function startNewGame() {
@@ -286,7 +300,7 @@
     inventory = {};
     usedGiftCodes = new Set();
     boughtGiftCodes = new Map();
-    showGameScreen();
+    // No longer showGameScreen() here
   }
 
   function toggleLoadInput() {
@@ -316,6 +330,7 @@
   }
 
   function showGameScreen() {
+    // This function now runs after the intro screen is hidden
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('game-content').style.display = 'block';
     updateBalance();
@@ -626,9 +641,9 @@
   function getRandomReward(currentBalance) {
     const roll = Math.random();
 
-    if (roll < 0.05) { // 5% chance
+    if (roll < 0.05) {
       return { type: 'gift_code' };
-    } else if (roll < 0.40) { // 35% chance
+    } else if (roll < 0.40) {
       const items = ['Lucky Charm', 'Super Clover', 'Jackpot Gem'];
       const chosenItem = items[Math.floor(Math.random() * items.length)];
       
@@ -638,7 +653,7 @@
       if (currentBalance > 10000) { itemCount = 5; }
       
       return { type: 'item', name: chosenItem, count: itemCount };
-    } else { // 60% chance
+    } else {
       let rewardAmount;
       if (currentBalance < 500) { 
         rewardAmount = Math.floor(Math.random() * 400) + 100;
