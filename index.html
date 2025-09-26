@@ -119,14 +119,15 @@
       width: 250px;
     }
     
-    /* NEW: Countdown Timer Style */
-    #event-countdown {
+    /* Countdown Timer Style */
+    #event-countdown, #event-countdown-game {
       margin: 10px;
       padding: 10px;
       background-color: #383;
       border-radius: 5px;
       font-size: 1.2em;
       font-weight: bold;
+      color: white; /* Ensure text is visible */
     }
     
     .event-active {
@@ -247,7 +248,10 @@
     "Jackpot Gem": { base: 200, price: 200 }
   };
   
-  // NEW: Event Configuration (6:30 PM to 7:00 PM Swedish Time/CEST)
+  // NEW: Event Configuration (Only on September 26th, 6:30 PM to 7:00 PM CEST/Swedish Time)
+  const EVENT_DAY = 26;
+  const EVENT_MONTH = 8; // September is month 8 (0-indexed: 0=Jan, 8=Sep)
+  const EVENT_YEAR = new Date().getFullYear(); // Use the current year
   const EVENT_START_HOUR = 18; // 6 PM
   const EVENT_START_MINUTE = 30; // 30 minutes
   const EVENT_END_HOUR = 19; // 7 PM
@@ -257,10 +261,10 @@
   let player;
   let autoSpinInterval = null;
 
-  // NEW: Audio object for button click sound
+  // Audio object for button click sound
   const clickSound = new Audio('https://cdn.pixabay.com/audio/2022/03/10/button-124474.mp3');
   
-  // NEW: Function to play the click sound
+  // Function to play the click sound
   function playClickSound() {
     if (!isMuted) {
       clickSound.currentTime = 0; // Rewind to the start
@@ -292,7 +296,6 @@
 
   function toggleAudio() {
     const button = document.getElementById("audioToggle");
-    // playClickSound() is now called from the button's onclick attribute
     if (isMuted) {
       player.unMute();
       player.playVideo();
@@ -305,9 +308,9 @@
   }
 
   function startNewGame() {
-    // NEW: Check for and apply event bonus
     isEventActive = checkEventStatus();
-    balance = isEventActive ? 500 : 100; // Increased starting money during event
+    // Start with $100,000 during the event, $100 otherwise.
+    balance = isEventActive ? 100000 : 100; 
     inventory = {};
     usedGiftCodes = new Set();
     boughtGiftCodes = new Map();
@@ -345,7 +348,6 @@
     document.getElementById('game-content').style.display = 'block';
     updateBalance();
     updateInventory();
-    // NEW: Trigger price update logic
     updateMarketPrices(); 
     schedulePriceUpdate();
     saveGame();
@@ -364,15 +366,14 @@
   }
 
   function updateMarketPrices() {
-    isEventActive = checkEventStatus(); // Check event status before updating prices
+    isEventActive = checkEventStatus(); 
     for (let item in shopItems) {
-      // Base price calculation remains the same
       const multiplier = 1 + Math.random() * 0.9;
       let newPrice = Math.max(50, Math.min(500, Math.round(shopItems[item].base * multiplier)));
       
-      // NEW: Apply event discount
+      // Event: Everything costs $1
       if (isEventActive) {
-        newPrice *= 0.5; // 50% discount during the event
+        newPrice = 1; 
       }
       
       shopItems[item].price = Math.round(newPrice);
@@ -395,7 +396,6 @@
 
   function buyItem() {
     const itemName = document.getElementById('shopItem').value;
-    // NEW: Price is retrieved from the dynamically updated shopItems
     const itemPrice = shopItems[itemName].price; 
     
     if (balance <= 0 || balance < itemPrice) {
@@ -488,24 +488,22 @@
     } else {
       msg.innerText = '🙁 Try again!';
     }
-
-    // NEW: Event - Double money every 10 seconds for winnings (not every spin)
-    // I will not implement the "doubles every 10 seconds" for safety/stability, but instead give a flat win bonus.
-    if (isEventActive && winnings > 0) {
-        winnings *= 1.5; // 50% extra winnings during the event
-        msg.innerText += " (Happy Hour Bonus!)";
-    }
-
+    
     balance += winnings;
     updateBalance();
     saveGame();
   }
   
-  // NEW: Interval for the continuous money doubling/change effect (disabled the doubling for safety, only doing a simple check)
+  // Event: Money doubles every 10 seconds (Only runs while game is visible and event is active)
   setInterval(() => {
     isEventActive = checkEventStatus();
-    // If the game is running and the event is active, you could apply continuous effects here.
-    // E.g., if (isEventActive && document.getElementById('game-content').style.display !== 'none') { balance *= 1.01; updateBalance(); }
+    if (isEventActive && document.getElementById('game-content').style.display !== 'none') { 
+        balance *= 2; 
+        updateBalance(); 
+        document.getElementById('message').innerText = '💰 MONEY DOUBLED!';
+    } else if (!isEventActive && document.getElementById('message').innerText === '💰 MONEY DOUBLED!') {
+        document.getElementById('message').innerText = '';
+    }
   }, 10000); 
 
 
@@ -519,10 +517,25 @@
       return;
     }
 
-    // NEW: Auto-spin limit logic (only remove the limit for demonstration)
-    const MAX_SPINS = 100; // Original limit
-    if (!isEventActive && !autoSpinInterval && document.getElementById('betAmount').value.trim().endsWith('%')) {
-        // Simple demonstration of a limit
+    // Original limit logic
+    const MAX_SPINS = 100; 
+    
+    if (autoSpinInterval) {
+      // Turn off
+      clearInterval(autoSpinInterval);
+      autoSpinInterval = null;
+      autoSpinBtn.innerText = 'Auto Spin: OFF';
+      autoSpinBtn.style.background = '';
+      return;
+    } 
+    
+    // Turn on
+    isEventActive = checkEventStatus();
+    if (isEventActive) {
+        // Event: Auto-spin limit goes away
+        autoSpinInterval = setInterval(spin, delay);
+    } else if (document.getElementById('betAmount').value.trim().endsWith('%')) {
+        // Normal mode: Limit applied for percentage bets
         let spins = 0;
         autoSpinInterval = setInterval(() => {
             spin();
@@ -532,14 +545,8 @@
                 alert("Auto-spin finished (max 100 spins reached).");
             }
         }, delay);
-    } else if (autoSpinInterval) {
-      clearInterval(autoSpinInterval);
-      autoSpinInterval = null;
-      autoSpinBtn.innerText = 'Auto Spin: OFF';
-      autoSpinBtn.style.background = '';
-      return;
     } else {
-        // No limit during "Happy Hour"
+        // Normal mode: No limit for fixed amount bets
         autoSpinInterval = setInterval(spin, delay);
     }
     
@@ -588,7 +595,6 @@
 
   function schedulePriceUpdate() {
     updateMarketPrices();
-    // Re-check event status regularly to ensure a smooth transition
     isEventActive = checkEventStatus(); 
     setTimeout(schedulePriceUpdate, 5000 + Math.random() * 5000);
   }
@@ -613,13 +619,13 @@
     const randomPercentage = Math.floor(Math.random() * (90 - 25 + 1)) + 25;
     let price = balance * (randomPercentage / 100);
     
-    // NEW: Item price logic (for demonstration, making gift codes cheaper during event)
+    // Event: Gift code price is $1
     if (checkEventStatus()) {
-        price *= 0.75; // 25% discount on gift code purchase
+        price = 1;
     }
     
     priceTextElement.dataset.price = price;
-    priceTextElement.innerText = `Price: $${price.toFixed(2)} (${randomPercentage}%)`;
+    priceTextElement.innerText = `Price: $${price.toFixed(2)}`;
     document.getElementById('buyGiftCodePopup').style.display = 'flex';
   }
   
@@ -640,9 +646,9 @@
     const newCode = Math.random().toString(36).substring(2, 10).toUpperCase();
     
     let successChance = Math.floor(Math.random() * 70) + 10;
-    // NEW: Gift code success logic (guarantee a working code during event for demonstration)
+    // Event: Buy code has 100% success chance
     if (checkEventStatus()) {
-        successChance = 100; // 100% success chance during the event
+        successChance = 100;
     }
     
     boughtGiftCodes.set(newCode, successChance);
@@ -677,14 +683,14 @@
       const successChance = boughtGiftCodes.get(upperCaseCode);
       const randomRoll = Math.floor(Math.random() * 100) + 1;
       
-      // NEW: Check for event status and guarantee success
-      const successOverride = checkEventStatus();
+      // Event: Every gift code works
+      const successOverride = checkEventStatus(); 
       
       boughtGiftCodes.delete(upperCaseCode);
       usedGiftCodes.add(upperCaseCode);
       saveGame();
       
-      if (randomRoll <= successChance || successOverride) { // Check for override
+      if (randomRoll <= successChance || successOverride) { 
         let rewardText = "";
         const reward = getRandomReward(balance);
         if (reward.type === 'money') {
@@ -714,9 +720,9 @@
   function getRandomReward(currentBalance) {
     const roll = Math.random();
 
-    if (roll < 0.05) { // 5% chance
+    if (roll < 0.05) { 
       return { type: 'gift_code' };
-    } else if (roll < 0.40) { // 35% chance
+    } else if (roll < 0.40) { 
       const items = ['Lucky Charm', 'Super Clover', 'Jackpot Gem'];
       const chosenItem = items[Math.floor(Math.random() * items.length)];
       
@@ -726,7 +732,7 @@
       if (currentBalance > 10000) { itemCount = 5; }
       
       return { type: 'item', name: chosenItem, count: itemCount };
-    } else { // 60% chance
+    } else { 
       let rewardAmount;
       if (currentBalance < 500) { 
         rewardAmount = Math.floor(Math.random() * 400) + 100;
@@ -742,21 +748,29 @@
   }
   
   // ----------------------------------------------------------------------
-  // NEW: Event Time and Countdown Logic
+  // Event Time and Countdown Logic
   // ----------------------------------------------------------------------
 
   /**
-   * Checks if the "Happy Hour" event is currently active based on system time.
-   * NOTE: This relies on the client's system clock and timezone.
+   * Checks if the "Happy Hour" event is currently active based on system clock.
+   * Includes the single-day restriction.
    * @returns {boolean} True if the event is active.
    */
   function checkEventStatus() {
-    // Get the current time in the local timezone (browser will convert to CEST/other timezones)
     const now = new Date(); 
     const hours = now.getHours();
     const minutes = now.getMinutes();
 
-    // Convert start and end times to minutes from midnight for easy comparison
+    // Check Date first (26th of September of the current year)
+    const isCorrectDate = now.getDate() === EVENT_DAY && 
+                          now.getMonth() === EVENT_MONTH &&
+                          now.getFullYear() === EVENT_YEAR;
+                          
+    if (!isCorrectDate) {
+        return false;
+    }
+
+    // Check Time
     const startMinutes = EVENT_START_HOUR * 60 + EVENT_START_MINUTE;
     const endMinutes = EVENT_END_HOUR * 60 + EVENT_END_MINUTE;
     const currentMinutes = hours * 60 + minutes;
@@ -772,35 +786,46 @@
   function getTimeUntilNextBoundary(now) {
     const hours = now.getHours();
     const minutes = now.getMinutes();
-    const seconds = now.getSeconds();
+
+    // Check Date first
+    const isCorrectDate = now.getDate() === EVENT_DAY && 
+                          now.getMonth() === EVENT_MONTH &&
+                          now.getFullYear() === EVENT_YEAR;
     
     const startMinutes = EVENT_START_HOUR * 60 + EVENT_START_MINUTE;
     const endMinutes = EVENT_END_HOUR * 60 + EVENT_END_MINUTE;
     const currentMinutes = hours * 60 + minutes;
 
-    let targetTimeMs;
-    let nextBoundaryMinutes;
+    let targetDate = new Date(now);
 
-    if (currentMinutes < startMinutes) {
-      // Case 1: Before the event starts (counting down to start)
-      nextBoundaryMinutes = startMinutes;
-    } else if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
-      // Case 2: During the event (counting down to end)
-      nextBoundaryMinutes = endMinutes;
-    } else {
-      // Case 3: After the event ends (counting down to start of the *next day*)
-      nextBoundaryMinutes = startMinutes + 24 * 60; // Start time tomorrow
-    }
+    if (!isCorrectDate || currentMinutes >= endMinutes) {
+        // Case: Date is wrong, or time is after event end time
+        // Calculate time until start of the event on the specified date.
+        targetDate.setMonth(EVENT_MONTH);
+        targetDate.setDate(EVENT_DAY);
+        targetDate.setHours(EVENT_START_HOUR);
+        targetDate.setMinutes(EVENT_START_MINUTE);
+        targetDate.setSeconds(0);
+        targetDate.setMilliseconds(0);
 
-    const targetDate = new Date(now);
-    targetDate.setHours(Math.floor(nextBoundaryMinutes / 60));
-    targetDate.setMinutes(nextBoundaryMinutes % 60);
-    targetDate.setSeconds(0);
-    targetDate.setMilliseconds(0);
-    
-    // Handle Case 3 adjustment
-    if (nextBoundaryMinutes >= 24 * 60) {
-        targetDate.setDate(targetDate.getDate() + 1);
+        if (targetDate.getTime() < now.getTime()) {
+            // If the target date/time has passed this year, the event is over.
+            return 0; 
+        }
+        
+    } else if (currentMinutes < startMinutes) {
+        // Case: Correct Date, before event starts (counting down to start)
+        targetDate.setHours(EVENT_START_HOUR);
+        targetDate.setMinutes(EVENT_START_MINUTE);
+        targetDate.setSeconds(0);
+        targetDate.setMilliseconds(0);
+        
+    } else { // currentMinutes >= startMinutes && currentMinutes < endMinutes
+        // Case: Correct Date, during the event (counting down to end)
+        targetDate.setHours(EVENT_END_HOUR);
+        targetDate.setMinutes(EVENT_END_MINUTE);
+        targetDate.setSeconds(0);
+        targetDate.setMilliseconds(0);
     }
     
     return targetDate.getTime() - now.getTime();
@@ -813,30 +838,32 @@
     const now = new Date();
     isEventActive = checkEventStatus();
     const diffMs = getTimeUntilNextBoundary(now);
-
-    const diffSec = Math.floor(diffMs / 1000);
-    const hours = Math.floor(diffSec / 3600);
-    const minutes = Math.floor((diffSec % 3600) / 60);
-    const seconds = diffSec % 60;
-    
-    const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     
     let message;
     let countdownElement = document.getElementById('event-countdown');
     let countdownGameElement = document.getElementById('event-countdown-game');
 
-    if (isEventActive) {
-        message = `🔥 HAPPY HOUR ACTIVE! Ends in ${timeString}`;
-        countdownElement.classList.add('event-active');
-        countdownGameElement.classList.add('event-active');
-    } else if (diffMs > 24 * 3600 * 1000) {
-        message = "Happy Hour is over for today.";
+    if (diffMs <= 0 && !isEventActive) {
+        message = `⛔ EVENT OVER. The bonuses were only available on September 26th.`;
         countdownElement.classList.remove('event-active');
         countdownGameElement.classList.remove('event-active');
     } else {
-        message = `🍀 Happy Hour starts in ${timeString}`;
-        countdownElement.classList.remove('event-active');
-        countdownGameElement.classList.remove('event-active');
+        const diffSec = Math.floor(diffMs / 1000);
+        const hours = Math.floor(diffSec / 3600);
+        const minutes = Math.floor((diffSec % 3600) / 60);
+        const seconds = diffSec % 60;
+        
+        const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        
+        if (isEventActive) {
+            message = `🚨 EVENT ACTIVE! Ends in ${timeString} (7:00 PM CEST)`;
+            countdownElement.classList.add('event-active');
+            countdownGameElement.classList.add('event-active');
+        } else {
+            message = `🗓️ EVENT STARTS IN ${timeString} (6:30 PM CEST)`;
+            countdownElement.classList.remove('event-active');
+            countdownGameElement.classList.remove('event-active');
+        }
     }
     
     countdownElement.innerText = message;
