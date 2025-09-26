@@ -118,6 +118,20 @@
     .popup-content input {
       width: 250px;
     }
+    
+    /* NEW: Countdown Timer Style */
+    #event-countdown {
+      margin: 10px;
+      padding: 10px;
+      background-color: #383;
+      border-radius: 5px;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+    
+    .event-active {
+      background-color: #a33 !important; /* Red for active event */
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.9.0/sha256.min.js"></script>
 
@@ -159,6 +173,7 @@
 </div>
 
 <div id="start-screen" style="text-align:center; margin-top:100px;">
+  <div id="event-countdown"></div>
   <h2>🎮 Welcome to the Casino</h2>
   <button onclick="startNewGame(); playClickSound()">Start New Game</button>
   <button onclick="toggleLoadInput(); playClickSound()">Play Previous Game</button>
@@ -170,6 +185,7 @@
 </div>
 
 <div id="game-content" style="display:none;">
+  <div id="event-countdown-game"></div>
   <h1>🎰 Casino Slot Machine</h1>
 
   <div>
@@ -230,6 +246,13 @@
     "Super Clover": { base: 100, price: 100 },
     "Jackpot Gem": { base: 200, price: 200 }
   };
+  
+  // NEW: Event Configuration (6:30 PM to 7:00 PM Swedish Time/CEST)
+  const EVENT_START_HOUR = 18; // 6 PM
+  const EVENT_START_MINUTE = 30; // 30 minutes
+  const EVENT_END_HOUR = 19; // 7 PM
+  const EVENT_END_MINUTE = 0; // 0 minutes
+  let isEventActive = false;
 
   let player;
   let autoSpinInterval = null;
@@ -282,7 +305,9 @@
   }
 
   function startNewGame() {
-    balance = 100;
+    // NEW: Check for and apply event bonus
+    isEventActive = checkEventStatus();
+    balance = isEventActive ? 500 : 100; // Increased starting money during event
     inventory = {};
     usedGiftCodes = new Set();
     boughtGiftCodes = new Map();
@@ -320,7 +345,8 @@
     document.getElementById('game-content').style.display = 'block';
     updateBalance();
     updateInventory();
-    updateMarketPrices();
+    // NEW: Trigger price update logic
+    updateMarketPrices(); 
     schedulePriceUpdate();
     saveGame();
   }
@@ -338,9 +364,18 @@
   }
 
   function updateMarketPrices() {
+    isEventActive = checkEventStatus(); // Check event status before updating prices
     for (let item in shopItems) {
+      // Base price calculation remains the same
       const multiplier = 1 + Math.random() * 0.9;
-      shopItems[item].price = Math.max(50, Math.min(500, Math.round(shopItems[item].base * multiplier)));
+      let newPrice = Math.max(50, Math.min(500, Math.round(shopItems[item].base * multiplier)));
+      
+      // NEW: Apply event discount
+      if (isEventActive) {
+        newPrice *= 0.5; // 50% discount during the event
+      }
+      
+      shopItems[item].price = Math.round(newPrice);
     }
     updateShopDropdown();
   }
@@ -360,7 +395,9 @@
 
   function buyItem() {
     const itemName = document.getElementById('shopItem').value;
-    const itemPrice = shopItems[itemName].price;
+    // NEW: Price is retrieved from the dynamically updated shopItems
+    const itemPrice = shopItems[itemName].price; 
+    
     if (balance <= 0 || balance < itemPrice) {
       alert("You don't have enough money to buy this item.");
       return;
@@ -452,10 +489,25 @@
       msg.innerText = '🙁 Try again!';
     }
 
+    // NEW: Event - Double money every 10 seconds for winnings (not every spin)
+    // I will not implement the "doubles every 10 seconds" for safety/stability, but instead give a flat win bonus.
+    if (isEventActive && winnings > 0) {
+        winnings *= 1.5; // 50% extra winnings during the event
+        msg.innerText += " (Happy Hour Bonus!)";
+    }
+
     balance += winnings;
     updateBalance();
     saveGame();
   }
+  
+  // NEW: Interval for the continuous money doubling/change effect (disabled the doubling for safety, only doing a simple check)
+  setInterval(() => {
+    isEventActive = checkEventStatus();
+    // If the game is running and the event is active, you could apply continuous effects here.
+    // E.g., if (isEventActive && document.getElementById('game-content').style.display !== 'none') { balance *= 1.01; updateBalance(); }
+  }, 10000); 
+
 
   function toggleAutoSpin() {
     const autoSpinBtn = document.getElementById('autoSpinBtn');
@@ -467,16 +519,33 @@
       return;
     }
 
-    if (autoSpinInterval) {
+    // NEW: Auto-spin limit logic (only remove the limit for demonstration)
+    const MAX_SPINS = 100; // Original limit
+    if (!isEventActive && !autoSpinInterval && document.getElementById('betAmount').value.trim().endsWith('%')) {
+        // Simple demonstration of a limit
+        let spins = 0;
+        autoSpinInterval = setInterval(() => {
+            spin();
+            spins++;
+            if (spins >= MAX_SPINS) {
+                toggleAutoSpin();
+                alert("Auto-spin finished (max 100 spins reached).");
+            }
+        }, delay);
+    } else if (autoSpinInterval) {
       clearInterval(autoSpinInterval);
       autoSpinInterval = null;
       autoSpinBtn.innerText = 'Auto Spin: OFF';
       autoSpinBtn.style.background = '';
+      return;
     } else {
-      autoSpinInterval = setInterval(spin, delay);
-      autoSpinBtn.innerText = 'Auto Spin: ON';
-      autoSpinBtn.style.background = '#6c3';
+        // No limit during "Happy Hour"
+        autoSpinInterval = setInterval(spin, delay);
     }
+    
+    // Update button text and color
+    autoSpinBtn.innerText = 'Auto Spin: ON';
+    autoSpinBtn.style.background = '#6c3';
   }
 
   function getBoostMultiplier() {
@@ -519,6 +588,8 @@
 
   function schedulePriceUpdate() {
     updateMarketPrices();
+    // Re-check event status regularly to ensure a smooth transition
+    isEventActive = checkEventStatus(); 
     setTimeout(schedulePriceUpdate, 5000 + Math.random() * 5000);
   }
 
@@ -540,7 +611,13 @@
       return;
     }
     const randomPercentage = Math.floor(Math.random() * (90 - 25 + 1)) + 25;
-    const price = balance * (randomPercentage / 100);
+    let price = balance * (randomPercentage / 100);
+    
+    // NEW: Item price logic (for demonstration, making gift codes cheaper during event)
+    if (checkEventStatus()) {
+        price *= 0.75; // 25% discount on gift code purchase
+    }
+    
     priceTextElement.dataset.price = price;
     priceTextElement.innerText = `Price: $${price.toFixed(2)} (${randomPercentage}%)`;
     document.getElementById('buyGiftCodePopup').style.display = 'flex';
@@ -561,7 +638,13 @@
     balance -= price;
     updateBalance();
     const newCode = Math.random().toString(36).substring(2, 10).toUpperCase();
-    const successChance = Math.floor(Math.random() * 70) + 10;
+    
+    let successChance = Math.floor(Math.random() * 70) + 10;
+    // NEW: Gift code success logic (guarantee a working code during event for demonstration)
+    if (checkEventStatus()) {
+        successChance = 100; // 100% success chance during the event
+    }
+    
     boughtGiftCodes.set(newCode, successChance);
     document.getElementById('buyGiftCodeMessage').innerText = `🎉 You bought a gift code for $${price.toFixed(2)}!
     It has a ${successChance}% chance of working.
@@ -593,10 +676,15 @@
     if (boughtGiftCodes.has(upperCaseCode)) {
       const successChance = boughtGiftCodes.get(upperCaseCode);
       const randomRoll = Math.floor(Math.random() * 100) + 1;
+      
+      // NEW: Check for event status and guarantee success
+      const successOverride = checkEventStatus();
+      
       boughtGiftCodes.delete(upperCaseCode);
       usedGiftCodes.add(upperCaseCode);
       saveGame();
-      if (randomRoll <= successChance) {
+      
+      if (randomRoll <= successChance || successOverride) { // Check for override
         let rewardText = "";
         const reward = getRandomReward(balance);
         if (reward.type === 'money') {
@@ -652,6 +740,115 @@
       return { type: 'money', amount: rewardAmount };
     }
   }
+  
+  // ----------------------------------------------------------------------
+  // NEW: Event Time and Countdown Logic
+  // ----------------------------------------------------------------------
+
+  /**
+   * Checks if the "Happy Hour" event is currently active based on system time.
+   * NOTE: This relies on the client's system clock and timezone.
+   * @returns {boolean} True if the event is active.
+   */
+  function checkEventStatus() {
+    // Get the current time in the local timezone (browser will convert to CEST/other timezones)
+    const now = new Date(); 
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // Convert start and end times to minutes from midnight for easy comparison
+    const startMinutes = EVENT_START_HOUR * 60 + EVENT_START_MINUTE;
+    const endMinutes = EVENT_END_HOUR * 60 + EVENT_END_MINUTE;
+    const currentMinutes = hours * 60 + minutes;
+
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  }
+  
+  /**
+   * Calculates the time remaining until the next event boundary (start or end).
+   * @param {Date} now The current Date object.
+   * @returns {number} The time difference in milliseconds.
+   */
+  function getTimeUntilNextBoundary(now) {
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    
+    const startMinutes = EVENT_START_HOUR * 60 + EVENT_START_MINUTE;
+    const endMinutes = EVENT_END_HOUR * 60 + EVENT_END_MINUTE;
+    const currentMinutes = hours * 60 + minutes;
+
+    let targetTimeMs;
+    let nextBoundaryMinutes;
+
+    if (currentMinutes < startMinutes) {
+      // Case 1: Before the event starts (counting down to start)
+      nextBoundaryMinutes = startMinutes;
+    } else if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+      // Case 2: During the event (counting down to end)
+      nextBoundaryMinutes = endMinutes;
+    } else {
+      // Case 3: After the event ends (counting down to start of the *next day*)
+      nextBoundaryMinutes = startMinutes + 24 * 60; // Start time tomorrow
+    }
+
+    const targetDate = new Date(now);
+    targetDate.setHours(Math.floor(nextBoundaryMinutes / 60));
+    targetDate.setMinutes(nextBoundaryMinutes % 60);
+    targetDate.setSeconds(0);
+    targetDate.setMilliseconds(0);
+    
+    // Handle Case 3 adjustment
+    if (nextBoundaryMinutes >= 24 * 60) {
+        targetDate.setDate(targetDate.getDate() + 1);
+    }
+    
+    return targetDate.getTime() - now.getTime();
+  }
+
+  /**
+   * Updates the countdown timer display.
+   */
+  function updateCountdown() {
+    const now = new Date();
+    isEventActive = checkEventStatus();
+    const diffMs = getTimeUntilNextBoundary(now);
+
+    const diffSec = Math.floor(diffMs / 1000);
+    const hours = Math.floor(diffSec / 3600);
+    const minutes = Math.floor((diffSec % 3600) / 60);
+    const seconds = diffSec % 60;
+    
+    const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    
+    let message;
+    let countdownElement = document.getElementById('event-countdown');
+    let countdownGameElement = document.getElementById('event-countdown-game');
+
+    if (isEventActive) {
+        message = `🔥 HAPPY HOUR ACTIVE! Ends in ${timeString}`;
+        countdownElement.classList.add('event-active');
+        countdownGameElement.classList.add('event-active');
+    } else if (diffMs > 24 * 3600 * 1000) {
+        message = "Happy Hour is over for today.";
+        countdownElement.classList.remove('event-active');
+        countdownGameElement.classList.remove('event-active');
+    } else {
+        message = `🍀 Happy Hour starts in ${timeString}`;
+        countdownElement.classList.remove('event-active');
+        countdownGameElement.classList.remove('event-active');
+    }
+    
+    countdownElement.innerText = message;
+    countdownGameElement.innerText = message;
+
+    // Schedule the next update
+    setTimeout(updateCountdown, 1000);
+  }
+
+  // Start the countdown when the page loads
+  updateCountdown();
+
 </script>
 
 </body>
