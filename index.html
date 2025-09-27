@@ -248,8 +248,8 @@
     "Jackpot Gem": { base: 200, price: 200 }
   };
   
-  // NEW: Event Configuration (Only on September 26th, 6:30 PM to 7:00 PM CEST/Swedish Time)
-  const EVENT_DAY = 26;
+  // NEW: Event Configuration (Changed to September 27th, 6:30 PM to 7:00 PM CEST/Swedish Time)
+  const EVENT_DAY = 27; // CHANGED FROM 26 TO 27
   const EVENT_MONTH = 8; // September is month 8 (0-indexed: 0=Jan, 8=Sep)
   const EVENT_YEAR = new Date().getFullYear(); // Use the current year
   const EVENT_START_HOUR = 18; // 6 PM
@@ -478,7 +478,15 @@
     let winnings = 0;
     if (slot1 === '7️⃣' && slot2 === '7️⃣' && slot3 === '7️⃣') {
       winnings = bet * 5;
-      msg.innerText = `🔥 Triple 7s! You won $${winnings.toFixed(2)}!`;
+      
+      // CRAZY BONUS: Triple 7s pays 50x the bet during the event!
+      if (checkEventStatus()) {
+          winnings = bet * 50;
+          msg.innerText = `🤯 ULTIMATE BONUS! Triple 7s! You won $${winnings.toFixed(2)}!`;
+      } else {
+          msg.innerText = `🔥 Triple 7s! You won $${winnings.toFixed(2)}!`;
+      }
+
     } else if (slot1 === slot2 && slot2 === slot3) {
       winnings = bet * 3.5;
       msg.innerText = `🎉 Jackpot! You won $${winnings.toFixed(2)}!`;
@@ -761,7 +769,7 @@
     const hours = now.getHours();
     const minutes = now.getMinutes();
 
-    // Check Date first (26th of September of the current year)
+    // Check Date first (27th of September of the current year)
     const isCorrectDate = now.getDate() === EVENT_DAY && 
                           now.getMonth() === EVENT_MONTH &&
                           now.getFullYear() === EVENT_YEAR;
@@ -844,7 +852,8 @@
     let countdownGameElement = document.getElementById('event-countdown-game');
 
     if (diffMs <= 0 && !isEventActive) {
-        message = `⛔ EVENT OVER. The bonuses were only available on September 26th.`;
+        // The message is adjusted to reflect the new date.
+        message = `⛔ EVENT OVER. The bonuses were only available on September 27th.`; 
         countdownElement.classList.remove('event-active');
         countdownGameElement.classList.remove('event-active');
     } else {
